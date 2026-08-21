@@ -151,5 +151,25 @@
         <Style Selector="ScrollBar">
             <Setter Property="AllowAutoHide" Value="True" />
         </Style>
+
+        <Style Selector="Border.infoHint">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Margin" Value="0,1,0,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Cursor" Value="Help" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style Selector="Border.infoHint Path">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Stretch" Value="Uniform" />
+            <Setter Property="Fill" Value="{StaticResource AppFaint}" />
+        </Style>
+
+        <Style Selector="Border.infoHint:pointerover Path">
+            <Setter Property="Fill" Value="{StaticResource AppMuted}" />
+        </Style>
     </Application.Styles>
 </Application>

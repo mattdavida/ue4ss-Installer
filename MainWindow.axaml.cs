@@ -149,6 +149,7 @@ public partial class MainWindow : Window
             {
                 _win64Path = null;
                 SyncListSelection();
+                RefreshInstalledMods();
                 UpdateActionButtons();
                 SetStatus("Ready");
             }
@@ -158,6 +159,7 @@ public partial class MainWindow : Window
 
         if (string.Equals(gameInstallPath.Trim().Trim('"'), _win64Path, StringComparison.OrdinalIgnoreCase))
         {
+            RefreshInstalledMods();
             ShowInstallStatus();
             return;
         }
@@ -167,6 +169,7 @@ public partial class MainWindow : Window
         {
             _win64Path = null;
             SyncListSelection();
+            RefreshInstalledMods();
             UpdateActionButtons();
             SetStatus("No Binaries/Win64 folder was found. Select the game's Steam folder (Manage → Browse local files).");
             return;
@@ -175,6 +178,7 @@ public partial class MainWindow : Window
         _win64Path = win64;
         PathTextBox.Text = win64;
         SyncListSelection();
+        RefreshInstalledMods();
         UpdateActionButtons();
         ShowInstallStatus();
     }
@@ -246,6 +250,33 @@ public partial class MainWindow : Window
         });
     }
 
+    private void OnUninstallClick(object? sender, RoutedEventArgs e)
+    {
+        if (_win64Path is null || _busy)
+            return;
+
+        UninstallConfirmOverlay.IsVisible = true;
+    }
+
+    private void OnUninstallCancelClick(object? sender, RoutedEventArgs e)
+        => UninstallConfirmOverlay.IsVisible = false;
+
+    private async void OnUninstallConfirmClick(object? sender, RoutedEventArgs e)
+    {
+        UninstallConfirmOverlay.IsVisible = false;
+        if (_win64Path is null || _busy)
+            return;
+
+        var win64Path = _win64Path;
+        await RunBusyAsync("Uninstalling UE4SS...", async () =>
+        {
+            await Task.Run(() => ZipInstaller.UninstallUe4ss(win64Path));
+            ClearManagedChannel(win64Path);
+            RefreshInstalledMods();
+            SetStatus("UE4SS was removed from this game.");
+        });
+    }
+
     private async void OnInstallModClick(object? sender, RoutedEventArgs e)
     {
         if (_win64Path is null || _busy)
@@ -272,10 +303,29 @@ public partial class MainWindow : Window
         await RunBusyAsync("Extracting...", async () =>
         {
             var result = await Task.Run(() => ZipInstaller.InstallMod(zipPath, win64Path));
+            RefreshInstalledMods();
             var where = result.Kind == ModPackageKind.GameDirectory
                 ? "the game folder (UE4SS pack / overlay)"
                 : "the Mods folder";
-            SetStatus($"Installed into {where}: {result.Destination}");
+            SetStatus($"Installed {result.Name} into {where}.");
+        });
+    }
+
+    private async void OnUninstallModClick(object? sender, RoutedEventArgs e)
+    {
+        if (_win64Path is null || _busy)
+            return;
+
+        if (InstalledModsCombo.SelectedItem is not InstalledMod mod)
+            return;
+
+        var win64Path = _win64Path;
+        var name = mod.Name;
+        await RunBusyAsync($"Removing {name}...", async () =>
+        {
+            await Task.Run(() => ZipInstaller.UninstallMod(win64Path, mod.Id));
+            RefreshInstalledMods();
+            SetStatus($"Removed {name}.");
         });
     }
 
@@ -301,6 +351,9 @@ public partial class MainWindow : Window
             UpdateActionButtons();
         }
     }
+
+    private void OnInstalledModsSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => UpdateActionButtons();
 
     private void ApplyGameFilter()
     {
@@ -342,6 +395,17 @@ public partial class MainWindow : Window
         {
             if (string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase))
                 game.ChannelLabel = label;
+        }
+
+        ApplyGameFilter();
+    }
+
+    private void ClearManagedChannel(string win64Path)
+    {
+        foreach (var game in _allGames)
+        {
+            if (string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase))
+                game.ChannelLabel = null;
         }
 
         ApplyGameFilter();
@@ -389,14 +453,35 @@ public partial class MainWindow : Window
     private void UpdateActionButtons()
     {
         var canAct = !_busy && _win64Path is not null;
+        var canUninstall = canAct
+                           && InstallTracker.Detect(_win64Path!).Kind != InstallKind.None;
         InstallButton.IsEnabled = canAct;
         InstallModButton.IsEnabled = canAct;
+        UninstallButton.IsEnabled = canUninstall;
         BrowseButton.IsEnabled = !_busy;
         AddGameManuallyButton.IsEnabled = !_busy;
         VersionComboBox.IsEnabled = !_busy;
         GamesListBox.IsEnabled = !_busy;
         SearchTextBox.IsEnabled = !_busy;
         PathTextBox.IsEnabled = !_busy;
+        UninstallModButton.IsEnabled = canAct
+                                       && InstalledModsCombo.SelectedItem is InstalledMod;
+        InstalledModsCombo.IsEnabled = !_busy;
+    }
+
+    private void RefreshInstalledMods()
+    {
+        if (_win64Path is null)
+        {
+            InstalledModsPanel.IsVisible = false;
+            InstalledModsCombo.ItemsSource = null;
+            return;
+        }
+
+        InstalledModsPanel.IsVisible = true;
+        var mods = ModTracker.List(_win64Path).ToList();
+        InstalledModsCombo.ItemsSource = mods;
+        InstalledModsCombo.SelectedIndex = mods.Count > 0 ? 0 : -1;
     }
 
     private void ShowInstallStatus()

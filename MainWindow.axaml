@@ -43,7 +43,7 @@
         </Border>
 
         <Grid x:Name="ContentRoot"
-              RowDefinitions="*,Auto,Auto,Auto,Auto,Auto"
+              RowDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto"
               RowSpacing="10"
               Margin="20,12,20,16">
             <Grid Grid.Row="0" RowDefinitions="Auto,Auto,*" RowSpacing="10">
@@ -161,20 +161,65 @@
             </StackPanel>
 
             <StackPanel Grid.Row="3" Spacing="8">
-                <TextBlock Text="UE4SS version"
-                           Foreground="{StaticResource AppMuted}"
-                           FontSize="12" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="UE4SS version"
+                               Foreground="{StaticResource AppMuted}"
+                               FontSize="12"
+                               VerticalAlignment="Center" />
+                    <Border Classes="infoHint">
+                        <ToolTip.Tip>
+                            <TextBlock Text="Channel switches stay clean after one install with this app. Manual UE4SS copies can leave leftover files."
+                                       TextWrapping="Wrap"
+                                       MaxWidth="280" />
+                        </ToolTip.Tip>
+                        <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                    </Border>
+                </StackPanel>
                 <ComboBox x:Name="VersionComboBox" SelectedIndex="0">
                     <ComboBoxItem Content="Release" />
                     <ComboBoxItem Content="zDev" />
                 </ComboBox>
-                <TextBlock Text="Channel switches stay clean after one install with this app. Manual UE4SS copies can leave leftover files."
-                           Foreground="{StaticResource AppFaint}"
-                           FontSize="11"
-                           TextWrapping="Wrap" />
             </StackPanel>
 
-            <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
+            <StackPanel x:Name="InstalledModsPanel"
+                        Grid.Row="4"
+                        Spacing="8"
+                        IsVisible="False">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Installed mods"
+                               Foreground="{StaticResource AppMuted}"
+                               FontSize="12"
+                               VerticalAlignment="Center" />
+                    <Border Classes="infoHint">
+                        <ToolTip.Tip>
+                            <TextBlock Text="Only zips installed with this app. Manual copies are not listed."
+                                       TextWrapping="Wrap"
+                                       MaxWidth="280" />
+                        </ToolTip.Tip>
+                        <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                    </Border>
+                </StackPanel>
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <ComboBox x:Name="InstalledModsCombo"
+                              Grid.Column="0"
+                              PlaceholderText="No mods installed with this app"
+                              SelectionChanged="OnInstalledModsSelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="services:InstalledMod">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button x:Name="UninstallModButton"
+                            Grid.Column="1"
+                            Classes="ghost"
+                            Content="Uninstall Mod"
+                            Click="OnUninstallModClick"
+                            IsEnabled="False" />
+                </Grid>
+            </StackPanel>
+
+            <WrapPanel Grid.Row="5" ItemSpacing="8" LineSpacing="8">
                 <Button x:Name="InstallButton"
                         Content="Install UE4SS"
                         Click="OnInstallClick"
@@ -185,9 +230,14 @@
                         Click="OnInstallModClick"
                         IsEnabled="False"
                         Classes="ghost" />
-            </StackPanel>
+                <Button x:Name="UninstallButton"
+                        Content="Uninstall UE4SS"
+                        Click="OnUninstallClick"
+                        IsEnabled="False"
+                        Classes="ghost" />
+            </WrapPanel>
 
-            <StackPanel Grid.Row="5" Spacing="8">
+            <StackPanel Grid.Row="6" Spacing="8">
                 <TextBlock x:Name="StatusText"
                            Text="Ready"
                            Foreground="{StaticResource AppMuted}"
@@ -198,5 +248,38 @@
                              IsVisible="False" />
             </StackPanel>
         </Grid>
+
+        <Border x:Name="UninstallConfirmOverlay"
+                IsVisible="False"
+                Background="#CC0E1014">
+            <Border Width="380"
+                    Padding="20"
+                    CornerRadius="10"
+                    Background="#1A2433"
+                    BorderBrush="#33FFFFFF"
+                    BorderThickness="1"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Uninstall UE4SS?"
+                               FontSize="16"
+                               FontWeight="SemiBold" />
+                    <TextBlock Text="This deletes the ue4ss folder (including mods and signatures) and UE4SS DLLs in Win64 such as dwmapi.dll."
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource AppMuted}"
+                               FontSize="13" />
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="8"
+                                HorizontalAlignment="Right">
+                        <Button Content="Cancel"
+                                Classes="ghost"
+                                Click="OnUninstallCancelClick" />
+                        <Button Content="Uninstall"
+                                Classes="accent"
+                                Click="OnUninstallConfirmClick" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Border>
     </Panel>
 </Window>

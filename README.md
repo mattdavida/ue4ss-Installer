@@ -21,6 +21,8 @@ After one install with this app, switching channels cleans files this installer 
 
 Same-channel updates keep `UE4SS-settings.ini`. Switching Release ↔ zDev overwrites it. Mods you added that are not in the UE4SS zip are left alone.
 
+**Uninstall UE4SS** deletes the `ue4ss` folder (mods and signatures included) and Win64-root UE4SS DLLs such as `dwmapi.dll`. Close the game first if a file is locked.
+
 ## Known signature packs
 
 Some games need extra Lua files in `ue4ss/UE4SS_Signatures`. When the selected game matches a known pack, **Install UE4SS** first extracts UE4SS, then downloads that pack’s latest GitHub release zip and copies the `.lua` files into `ue4ss/UE4SS_Signatures`. zDev already ships that folder; Release often does not, so the installer creates it after UE4SS is in place. If `ue4ss/` is missing, signatures are skipped — they are never copied next to the game exe.
@@ -39,7 +41,7 @@ Signature files are not added to the UE4SS manifest, so a later channel switch w
 - Full pack (`dwmapi.dll` + `ue4ss/`) or a `ue4ss/` overlay → extracted into `Binaries/Win64`
 - Anything else → extracted into `ue4ss/Mods` (a leading `Mods/` folder is stripped)
 
-Mod files are not added to the UE4SS manifest, so a later channel switch will not delete them.
+Mod files installed with this app are listed under **Installed mods** and can be removed with **Uninstall Mod**. Files that belong to UE4SS itself are left alone. Manual copies into `Mods` are not listed (a later folder scan can reconcile those).
 
 ## Steam Deck / Linux
 

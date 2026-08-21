@@ -43,10 +43,62 @@ public static class ZipInstaller
     }
 
     /// <summary>
+    /// Removes UE4SS: deletes <c>ue4ss/</c> (mods and signatures included) and Win64-root
+    /// proxy DLLs such as <c>dwmapi.dll</c>. Extra root files from a managed manifest are
+    /// deleted too.
+    /// </summary>
+    public static void UninstallUe4ss(string win64Path)
+    {
+        var manifest = InstallTracker.TryLoad(win64Path);
+
+        if (manifest is not null)
+        {
+            foreach (var relative in manifest.Files)
+            {
+                var norm = NormalizeRelative(relative);
+                if (norm.StartsWith("ue4ss/", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(norm, "ue4ss", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var dest = SafeCombine(win64Path, norm);
+                if (dest is null)
+                    continue;
+
+                TryDeleteFile(dest);
+            }
+        }
+
+        foreach (var name in new[] { "dwmapi.dll", "UE4SS.dll" })
+            TryDeleteFile(Path.Combine(win64Path, name));
+
+        TryDeleteFile(Path.Combine(win64Path, InstallerManifest.FileName));
+
+        var ue4ssDir = Path.Combine(win64Path, "ue4ss");
+        if (Directory.Exists(ue4ssDir))
+            Directory.Delete(ue4ssDir, recursive: true);
+    }
+
+    private static void TryDeleteFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (Exception ex)
+        {
+            throw new IOException($"Could not delete {path}: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// Installs a user zip. Full UE4SS packs (<c>dwmapi.dll</c> + <c>ue4ss/</c>, optionally
     /// inside one wrapper folder) and <c>ue4ss/</c> overlays (signatures, extra mods) extract
     /// into Win64. Everything else extracts into the Mods folder.
     /// Not recorded in the UE4SS manifest, so channel switches will not delete these files.
+    /// Recorded in <c>.ue4ss-installer-mods.json</c> for per-mod uninstall.
     /// </summary>
     public static ModInstallResult InstallMod(string zipPath, string win64Path)
     {
@@ -58,9 +110,89 @@ public static class ZipInstaller
             : ResolveModsDirectory(win64Path);
 
         Directory.CreateDirectory(destination);
-        ExtractMapped(archive, destination, layout.StripPrefix);
+        var extracted = ExtractMapped(archive, destination, layout.StripPrefix);
+        var relativeToWin64 = extracted
+            .Select(relative => RelativizeToWin64(win64Path, destination, relative))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        return new ModInstallResult(layout.Kind, destination);
+        var name = Path.GetFileNameWithoutExtension(zipPath);
+        if (string.IsNullOrWhiteSpace(name))
+            name = "Mod";
+
+        var previous = ModTracker.Load(win64Path).Mods
+            .FirstOrDefault(m => string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (previous is not null)
+        {
+            var keep = new HashSet<string>(relativeToWin64, StringComparer.OrdinalIgnoreCase);
+            keep.UnionWith(Ue4ssOwnedFiles(win64Path));
+            RemoveOrphans(win64Path, previous.Files, keep);
+        }
+
+        ModTracker.SaveMod(win64Path, new InstalledMod
+        {
+            Name = name,
+            Kind = layout.Kind,
+            Files = relativeToWin64
+        });
+
+        return new ModInstallResult(layout.Kind, destination, name, relativeToWin64);
+    }
+
+    public static void UninstallMod(string win64Path, string modId)
+    {
+        var mod = ModTracker.List(win64Path).FirstOrDefault(m => m.Id == modId)
+                  ?? throw new InvalidOperationException("That mod is not in the installer list.");
+
+        var keep = Ue4ssOwnedFiles(win64Path);
+        RemoveOrphans(win64Path, mod.Files, keep);
+
+        foreach (var relative in mod.Files)
+        {
+            if (keep.Contains(NormalizeRelative(relative)))
+                continue;
+
+            var full = SafeCombine(win64Path, relative);
+            if (full is not null && File.Exists(full))
+            {
+                throw new IOException(
+                    $"Could not delete {full}. Close the game and try again.");
+            }
+        }
+
+        ModTracker.Remove(win64Path, modId);
+    }
+
+    private static HashSet<string> Ue4ssOwnedFiles(string win64Path)
+    {
+        var owned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var manifest = InstallTracker.TryLoad(win64Path);
+        if (manifest is not null)
+        {
+            foreach (var file in manifest.Files)
+                owned.Add(NormalizeRelative(file));
+        }
+
+        owned.Add(NormalizeRelative(Path.Combine("ue4ss", InstallerManifest.FileName)));
+        owned.Add(NormalizeRelative(Path.Combine("ue4ss", ModsManifest.FileName)));
+        owned.Add(InstallerManifest.FileName);
+        owned.Add(ModsManifest.FileName);
+        return owned;
+    }
+
+    private static string RelativizeToWin64(string win64Path, string destination, string relativeToDest)
+    {
+        var destFile = SafeCombine(destination, relativeToDest);
+        if (destFile is null)
+            return NormalizeRelative(relativeToDest);
+
+        var winFull = Path.GetFullPath(win64Path);
+        var prefix = winFull.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        if (!destFile.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            return NormalizeRelative(relativeToDest);
+
+        return NormalizeRelative(destFile[prefix.Length..]);
     }
 
     /// <summary>
@@ -236,8 +368,11 @@ public static class ZipInstaller
         => relative.EndsWith("UE4SS-settings.ini", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsManifestFile(string relative)
-        => relative.EndsWith(InstallerManifest.FileName, StringComparison.OrdinalIgnoreCase)
-           || string.Equals(Path.GetFileName(relative), InstallerManifest.FileName, StringComparison.OrdinalIgnoreCase);
+    {
+        var fileName = Path.GetFileName(relative);
+        return string.Equals(fileName, InstallerManifest.FileName, StringComparison.OrdinalIgnoreCase)
+               || string.Equals(fileName, ModsManifest.FileName, StringComparison.OrdinalIgnoreCase);
+    }
 
     internal static string NormalizeRelative(string relative)
         => relative.Replace('\\', '/').Trim('/');
@@ -278,8 +413,9 @@ public static class ZipInstaller
         return new ModZipLayout(ModPackageKind.ModsFolder, strip);
     }
 
-    private static void ExtractMapped(ZipArchive archive, string destination, string? stripPrefix)
+    private static List<string> ExtractMapped(ZipArchive archive, string destination, string? stripPrefix)
     {
+        var extracted = new List<string>();
         foreach (var entry in archive.Entries)
         {
             var relative = NormalizeRelative(entry.FullName);
@@ -311,7 +447,10 @@ public static class ZipInstaller
                 Directory.CreateDirectory(parent);
 
             entry.ExtractToFile(dest, overwrite: true);
+            extracted.Add(NormalizeRelative(relative));
         }
+
+        return extracted;
     }
 
     private static bool LooksLikeGameDirectoryPackage(IReadOnlyList<string> relatives)
@@ -400,6 +539,10 @@ public enum ModPackageKind
     ModsFolder
 }
 
-public sealed record ModInstallResult(ModPackageKind Kind, string Destination);
+public sealed record ModInstallResult(
+    ModPackageKind Kind,
+    string Destination,
+    string Name,
+    IReadOnlyList<string> Files);
 
 internal sealed record ModZipLayout(ModPackageKind Kind, string? StripPrefix);
