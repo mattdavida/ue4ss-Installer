@@ -261,10 +261,12 @@
                     HorizontalAlignment="Center"
                     VerticalAlignment="Center">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="Uninstall UE4SS?"
+                    <TextBlock x:Name="ConfirmTitle"
+                               Text="Uninstall UE4SS?"
                                FontSize="16"
                                FontWeight="SemiBold" />
-                    <TextBlock Text="This deletes the ue4ss folder (including mods and signatures) and UE4SS DLLs in Win64 such as dwmapi.dll."
+                    <TextBlock x:Name="ConfirmBody"
+                               Text="This deletes the ue4ss folder (including mods and signatures) and UE4SS DLLs in Win64 such as dwmapi.dll."
                                TextWrapping="Wrap"
                                Foreground="{StaticResource AppMuted}"
                                FontSize="13" />

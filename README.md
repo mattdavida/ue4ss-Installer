@@ -8,6 +8,14 @@ This is a community installer. It is not affiliated with Epic Games or the UE4SS
   <img src="Assets/ue4ss-installer-hero.png" alt="UE4SS Installer" width="520" />
 </p>
 
+## Windows may warn you
+
+This app is not code-signed yet, so Windows SmartScreen often shows **Windows protected your PC** on first run. That is Windows treating an unknown exe as untrusted, not a verdict that the file is malware. Click **More info**, then **Run anyway**.
+
+Antivirus tools sometimes flag `dwmapi.dll` next to a game exe. UE4SS loads that way on purpose. It is not extra software this installer invented.
+
+A VirusTotal scan of the published exe will be linked here (and on the GitHub release) once a public build is posted.
+
 ## Use it
 
 1. Open the app. It scans Steam for Unreal games (`Binaries/Win64`, skipping Engine copies).
@@ -56,6 +64,7 @@ chmod +x UE4SSInstaller
 Requires the [.NET 9 SDK](https://dotnet.microsoft.com/download).
 
 ```bash
+dotnet test
 dotnet run
 ```
 

@@ -92,7 +92,29 @@ public static class GitHubFetcher
             await remote.CopyToAsync(file, cancellationToken);
         }
 
+        EnsureCompleteDownload(destination, asset.Size);
         return destination;
+    }
+
+    internal static void EnsureCompleteDownload(string path, long expectedSize)
+    {
+        if (expectedSize <= 0)
+            return;
+
+        var actual = new FileInfo(path).Length;
+        if (actual == expectedSize)
+            return;
+
+        try
+        {
+            File.Delete(path);
+        }
+        catch
+        {
+            // Best-effort; the size check is what matters.
+        }
+
+        throw new IOException("Download didn't finish. Try again.");
     }
 
     internal static GitHubAsset? SelectAsset(IReadOnlyList<GitHubAsset> assets, Ue4ssChannel channel)
@@ -190,6 +212,8 @@ internal sealed class GitHubAsset
     public string Name { get; set; } = "";
 
     public string BrowserDownloadUrl { get; set; } = "";
+
+    public long Size { get; set; }
 
     public DateTimeOffset UpdatedAt { get; set; }
 
