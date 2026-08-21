@@ -121,16 +121,24 @@
             <Setter Property="Background" Value="Transparent" />
         </Style>
 
+        <Style Selector="Border.GameRow">
+            <Setter Property="Background" Value="#14FFFFFF" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+
         <Style Selector="ListBoxItem:pointerover Border.GameRow">
             <Setter Property="Background" Value="#22FFFFFF" />
         </Style>
 
         <Style Selector="ListBoxItem:selected Border.GameRow">
-            <Setter Property="Background" Value="#2E00A3FF" />
+            <Setter Property="Background" Value="#3D00A3FF" />
+            <Setter Property="BorderBrush" Value="{StaticResource AppAccent}" />
         </Style>
 
         <Style Selector="ListBoxItem:selected:pointerover Border.GameRow">
-            <Setter Property="Background" Value="#3D00A3FF" />
+            <Setter Property="Background" Value="#5200A3FF" />
+            <Setter Property="BorderBrush" Value="{StaticResource AppAccent}" />
         </Style>
 
         <Style Selector="ProgressBar">

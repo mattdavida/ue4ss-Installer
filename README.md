@@ -48,9 +48,10 @@ dotnet run
 
 Standalone builds (no .NET install on the target machine). One file: `UE4SSInstaller.exe` on Windows, `UE4SSInstaller` on Linux.
 
-```bash
-dotnet publish -c Release -r win-x64
-dotnet publish -c Release -r linux-x64
+```powershell
+.\deploy.ps1          # win-x64
+.\deploy.ps1 -Linux   # linux-x64
+.\deploy.ps1 -All     # both
 ```
 
 Windows output: `bin/Release/net9.0/win-x64/publish/UE4SSInstaller.exe`  

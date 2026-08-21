@@ -148,6 +148,7 @@ public partial class MainWindow : Window
             if (_win64Path is not null)
             {
                 _win64Path = null;
+                SyncListSelection();
                 UpdateActionButtons();
                 SetStatus("Ready");
             }
@@ -165,6 +166,7 @@ public partial class MainWindow : Window
         if (win64 is null)
         {
             _win64Path = null;
+            SyncListSelection();
             UpdateActionButtons();
             SetStatus("No Binaries/Win64 folder was found. Select the game's Steam folder (Manage → Browse local files).");
             return;
@@ -172,6 +174,7 @@ public partial class MainWindow : Window
 
         _win64Path = win64;
         PathTextBox.Text = win64;
+        SyncListSelection();
         UpdateActionButtons();
         ShowInstallStatus();
     }
@@ -303,6 +306,29 @@ public partial class MainWindow : Window
         }
 
         ApplyGameFilter();
+    }
+
+    private void SyncListSelection()
+    {
+        DetectedGame? match = null;
+        if (_win64Path is not null)
+        {
+            match = _allGames.FirstOrDefault(game =>
+                string.Equals(game.Win64Path, _win64Path, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (ReferenceEquals(GamesListBox.SelectedItem, match))
+            return;
+
+        _applyingSelection = true;
+        try
+        {
+            GamesListBox.SelectedItem = match;
+        }
+        finally
+        {
+            _applyingSelection = false;
+        }
     }
 
     private void ClearGameSelection()

@@ -66,13 +66,13 @@
                         Padding="4">
                     <Panel>
                         <ListBox x:Name="GamesListBox"
+                                 SelectionMode="Single"
                                  SelectionChanged="OnGamesSelectionChanged">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="services:DetectedGame">
                                     <Border Classes="GameRow"
                                             CornerRadius="8"
                                             Padding="8,6"
-                                            Background="#14FFFFFF"
                                             ToolTip.Tip="{Binding InstallPath}">
                                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                                             <Panel Grid.Column="0" Width="32" Height="32">
