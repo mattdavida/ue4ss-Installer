@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace UE4SSInstaller.Services;
 
@@ -16,6 +17,10 @@ public enum Ue4ssChannel
 public static class GitHubFetcher
 {
     private const string ExperimentalLatestUrl = "https://api.github.com/repos/UE4SS-RE/RE-UE4SS/releases/tags/experimental-latest";
+
+    private static readonly Regex SafeRepoPart = new(
+        @"^[A-Za-z0-9_.-]+$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private static readonly HttpClient Http = CreateClient();
 
@@ -36,6 +41,38 @@ public static class GitHubFetcher
         var asset = SelectAsset(release.Assets, channel)
                     ?? throw new InvalidOperationException($"No matching {channel} zip was found on experimental-latest.");
 
+        return await DownloadAssetAsync(asset, cancellationToken);
+    }
+
+    public static async Task<string> DownloadLatestReleaseZipAsync(
+        string owner,
+        string repo,
+        CancellationToken cancellationToken = default)
+    {
+        if (!SafeRepoPart.IsMatch(owner) || !SafeRepoPart.IsMatch(repo))
+            throw new InvalidOperationException("Invalid GitHub repository.");
+
+        var url = $"https://api.github.com/repos/{owner}/{repo}/releases/latest";
+        using var response = await Http.GetAsync(url, cancellationToken);
+        EnsureApiSuccess(response);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var release = await JsonSerializer.DeserializeAsync<GitHubRelease>(stream, JsonOptions, cancellationToken)
+                      ?? throw new InvalidOperationException("GitHub returned an empty release payload.");
+
+        var asset = release.Assets
+                        .Where(a => Path.GetFileName(a.Name)
+                            .EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(a => a.UpdatedAt)
+                        .ThenByDescending(a => a.CreatedAt)
+                        .FirstOrDefault()
+                    ?? throw new InvalidOperationException($"No zip was found on {owner}/{repo} latest release.");
+
+        return await DownloadAssetAsync(asset, cancellationToken);
+    }
+
+    private static async Task<string> DownloadAssetAsync(GitHubAsset asset, CancellationToken cancellationToken)
+    {
         var fileName = Path.GetFileName(asset.Name);
         if (string.IsNullOrWhiteSpace(fileName)
             || !fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))

@@ -93,6 +93,7 @@ public static class SteamScanner
                     InstallPath = fullInstall,
                     Win64Path = win64,
                     ExePath = exePath,
+                    AppId = appId,
                     Icon = GameIconLoader.Load(exePath, artwork),
                     ChannelLabel = channelLabel
                 });

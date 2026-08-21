@@ -63,6 +63,63 @@ public static class ZipInstaller
         return new ModInstallResult(layout.Kind, destination);
     }
 
+    /// <summary>
+    /// Extracts <c>.lua</c> files into <c>ue4ss/UE4SS_Signatures</c>.
+    /// Creates that folder when it is missing (Release). Does not copy if <c>ue4ss/</c> is absent.
+    /// Not recorded in the UE4SS manifest.
+    /// </summary>
+    public static string InstallSignaturePack(string zipPath, string win64Path)
+    {
+        if (!TryGetSignaturesDirectory(win64Path, out var destination))
+        {
+            throw new InvalidOperationException(
+                "UE4SS did not create a ue4ss folder, so signatures were not copied.");
+        }
+
+        Directory.CreateDirectory(destination);
+
+        var count = 0;
+        using var archive = ZipFile.OpenRead(zipPath);
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name)
+                || !entry.Name.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var fileName = Path.GetFileName(entry.Name);
+            if (string.IsNullOrEmpty(fileName)
+                || fileName is "." or ".."
+                || fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+            {
+                continue;
+            }
+
+            var dest = Path.Combine(destination, fileName);
+            entry.ExtractToFile(dest, overwrite: true);
+            count++;
+        }
+
+        if (count == 0)
+            throw new InvalidOperationException("The signature zip did not contain any .lua files.");
+
+        return destination;
+    }
+
+    public static bool TryGetSignaturesDirectory(string win64Path, out string destination)
+    {
+        var ue4ssDir = Path.Combine(win64Path, "ue4ss");
+        if (!Directory.Exists(ue4ssDir))
+        {
+            destination = string.Empty;
+            return false;
+        }
+
+        destination = Path.Combine(ue4ssDir, "UE4SS_Signatures");
+        return true;
+    }
+
     public static string ResolveModsDirectory(string win64Path)
     {
         var ue4ssDir = Path.Combine(win64Path, "ue4ss");
