@@ -21,6 +21,17 @@ After one install with this app, switching channels cleans files this installer 
 
 Same-channel updates keep `UE4SS-settings.ini`. Switching Release ↔ zDev overwrites it. Mods you added that are not in the UE4SS zip are left alone.
 
+## Known signature packs
+
+Some games need extra Lua files in `ue4ss/UE4SS_Signatures`. When the selected game matches a known pack, **Install UE4SS** first extracts UE4SS, then downloads that pack’s latest GitHub release zip and copies the `.lua` files into `ue4ss/UE4SS_Signatures`. zDev already ships that folder; Release often does not, so the installer creates it after UE4SS is in place. If `ue4ss/` is missing, signatures are skipped — they are never copied next to the game exe.
+
+Currently included:
+
+- [Mortal Shell II](https://github.com/mattdavida/MortalShell2-UE4SS-Fix) (`StaticConstructObject.lua`)
+- [Witchfire](https://github.com/mattdavida/Witchfire-ue4ss-fix) (`ConsoleManager.lua`, plus `EngineVersionOverride` 4.27 in `UE4SS-settings.ini`)
+
+Signature files are not added to the UE4SS manifest, so a later channel switch will not delete them. They are overwritten on the next install.
+
 ## Install a mod zip
 
 **Install Mod Zip** looks at the archive (and one wrapper folder, if present):

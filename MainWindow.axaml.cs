@@ -203,7 +203,46 @@ public partial class MainWindow : Window
             }
 
             MarkManagedChannel(win64Path, channel);
-            SetStatus($"Installed {FormatChannel(channel)}. {InstallTracker.Detect(win64Path).StatusText}");
+
+            var pack = FindSignaturePack(win64Path);
+            if (pack is null)
+            {
+                SetStatus($"Installed {FormatChannel(channel)}. {InstallTracker.Detect(win64Path).StatusText}");
+                return;
+            }
+
+            if (!ZipInstaller.TryGetSignaturesDirectory(win64Path, out _))
+            {
+                SetStatus($"Installed {FormatChannel(channel)}, but ue4ss/ was missing so signatures were not copied.");
+                return;
+            }
+
+            try
+            {
+                SetStatus($"Applying {pack.DisplayName}...");
+                var signatureZip = await GitHubFetcher.DownloadLatestReleaseZipAsync(pack.Owner, pack.Repo);
+                try
+                {
+                    var dest = await Task.Run(() => ZipInstaller.InstallSignaturePack(signatureZip, win64Path));
+                    if (pack.HasEngineVersionOverride)
+                    {
+                        await Task.Run(() => SettingsIniPatcher.ApplyEngineVersion(
+                            win64Path,
+                            pack.EngineMajorVersion!.Value,
+                            pack.EngineMinorVersion!.Value));
+                    }
+
+                    SetStatus($"Installed {FormatChannel(channel)} and {pack.DisplayName} into {dest}.");
+                }
+                finally
+                {
+                    TryDelete(signatureZip);
+                }
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"Installed {FormatChannel(channel)}, but the signature pack failed: {ex.Message}");
+            }
         });
     }
 
@@ -369,6 +408,16 @@ public partial class MainWindow : Window
         }
 
         SetStatus(InstallTracker.Detect(_win64Path).StatusText);
+        var pack = FindSignaturePack(_win64Path);
+        if (pack is not null)
+            SetStatus($"{StatusText.Text} {pack.DisplayName} will be applied on install.");
+    }
+
+    private KnownSignaturePack? FindSignaturePack(string win64Path)
+    {
+        var game = _allGames.FirstOrDefault(g =>
+            string.Equals(g.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase));
+        return KnownSignatureCatalog.Find(game?.AppId, game?.Name, game?.InstallPath, win64Path);
     }
 
     private static string FormatChannel(Ue4ssChannel channel)
