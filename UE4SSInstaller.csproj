@@ -8,7 +8,12 @@
     <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
     <AssemblyTitle>UE4SS Installer</AssemblyTitle>
     <Product>UE4SS Installer</Product>
+    <DefaultItemExcludes>$(DefaultItemExcludes);UE4SSInstaller.Tests\**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="UE4SSInstaller.Tests" />
+  </ItemGroup>
 
   <!-- Applied when publishing with -r (win-x64 / linux-x64). Left off the default
        PropertyGroup so everyday `dotnet run` stays a fast framework-dependent build. -->

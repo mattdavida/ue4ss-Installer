@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private string? _win64Path;
     private bool _busy;
     private bool _applyingSelection;
+    private InstalledMod? _pendingModUninstall;
 
     public MainWindow()
     {
@@ -255,11 +256,18 @@ public partial class MainWindow : Window
         if (_win64Path is null || _busy)
             return;
 
+        _pendingModUninstall = null;
+        ConfirmTitle.Text = "Uninstall UE4SS?";
+        ConfirmBody.Text =
+            "This deletes the ue4ss folder (including mods and signatures) and UE4SS DLLs in Win64 such as dwmapi.dll.";
         UninstallConfirmOverlay.IsVisible = true;
     }
 
     private void OnUninstallCancelClick(object? sender, RoutedEventArgs e)
-        => UninstallConfirmOverlay.IsVisible = false;
+    {
+        UninstallConfirmOverlay.IsVisible = false;
+        _pendingModUninstall = null;
+    }
 
     private async void OnUninstallConfirmClick(object? sender, RoutedEventArgs e)
     {
@@ -268,6 +276,21 @@ public partial class MainWindow : Window
             return;
 
         var win64Path = _win64Path;
+        var mod = _pendingModUninstall;
+        _pendingModUninstall = null;
+
+        if (mod is not null)
+        {
+            var name = mod.Name;
+            await RunBusyAsync($"Removing {name}...", async () =>
+            {
+                await Task.Run(() => ZipInstaller.UninstallMod(win64Path, mod.Id));
+                RefreshInstalledMods();
+                SetStatus($"Removed {name}.");
+            });
+            return;
+        }
+
         await RunBusyAsync("Uninstalling UE4SS...", async () =>
         {
             await Task.Run(() => ZipInstaller.UninstallUe4ss(win64Path));
@@ -311,7 +334,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private async void OnUninstallModClick(object? sender, RoutedEventArgs e)
+    private void OnUninstallModClick(object? sender, RoutedEventArgs e)
     {
         if (_win64Path is null || _busy)
             return;
@@ -319,14 +342,11 @@ public partial class MainWindow : Window
         if (InstalledModsCombo.SelectedItem is not InstalledMod mod)
             return;
 
-        var win64Path = _win64Path;
-        var name = mod.Name;
-        await RunBusyAsync($"Removing {name}...", async () =>
-        {
-            await Task.Run(() => ZipInstaller.UninstallMod(win64Path, mod.Id));
-            RefreshInstalledMods();
-            SetStatus($"Removed {name}.");
-        });
+        _pendingModUninstall = mod;
+        ConfirmTitle.Text = $"Remove {mod.Name}?";
+        ConfirmBody.Text =
+            "This deletes the files this app installed for that mod. UE4SS itself is left alone.";
+        UninstallConfirmOverlay.IsVisible = true;
     }
 
     private async Task RunBusyAsync(string status, Func<Task> work)
