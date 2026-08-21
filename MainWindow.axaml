@@ -1,0 +1,195 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:services="clr-namespace:UE4SSInstaller.Services"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="700"
+        x:Class="UE4SSInstaller.MainWindow"
+        Title="UE4SS Installer"
+        Icon="/Assets/icon.ico"
+        Width="500"
+        Height="700"
+        MinWidth="460"
+        MinHeight="600"
+        Background="#0E1014"
+        WindowStartupLocation="CenterScreen"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaTitleBarHeightHint="44"
+        RenderOptions.BitmapInterpolationMode="HighQuality"
+        Opened="OnWindowOpened">
+    <Panel>
+        <Border IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="50%,0%" EndPoint="50%,100%">
+                    <GradientStop Color="#1A2433" Offset="0" />
+                    <GradientStop Color="#0E1014" Offset="0.48" />
+                    <GradientStop Color="#090B0F" Offset="1" />
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+        <Border IsHitTestVisible="False"
+                Height="280"
+                VerticalAlignment="Top"
+                Opacity="0.4">
+            <Border.Background>
+                <RadialGradientBrush Center="80%,0%"
+                                     GradientOrigin="80%,0%"
+                                     RadiusX="0.85"
+                                     RadiusY="1.05">
+                    <GradientStop Color="#3D00A3FF" Offset="0" />
+                    <GradientStop Color="#0000A3FF" Offset="1" />
+                </RadialGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <Grid x:Name="ContentRoot"
+              RowDefinitions="*,Auto,Auto,Auto,Auto,Auto"
+              RowSpacing="10"
+              Margin="20,12,20,16">
+            <Grid Grid.Row="0" RowDefinitions="Auto,Auto,*" RowSpacing="10">
+                <TextBlock Text="Click a game below. If it isn't listed, add it manually."
+                           Foreground="{StaticResource AppMuted}"
+                           FontSize="13"
+                           TextWrapping="Wrap" />
+
+                <TextBox x:Name="SearchTextBox"
+                         Grid.Row="1"
+                         PlaceholderText="Search a game..."
+                         TextChanged="OnSearchTextChanged" />
+
+                <Border Grid.Row="2"
+                        CornerRadius="10"
+                        Background="#10FFFFFF"
+                        BorderBrush="#14FFFFFF"
+                        BorderThickness="1"
+                        ClipToBounds="True"
+                        Padding="4">
+                    <Panel>
+                        <ListBox x:Name="GamesListBox"
+                                 SelectionChanged="OnGamesSelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="services:DetectedGame">
+                                    <Border Classes="GameRow"
+                                            CornerRadius="8"
+                                            Padding="8,6"
+                                            Background="#14FFFFFF"
+                                            ToolTip.Tip="{Binding InstallPath}">
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                                            <Panel Grid.Column="0" Width="32" Height="32">
+                                                <Border CornerRadius="7"
+                                                        ClipToBounds="True"
+                                                        IsVisible="{Binding HasIcon}">
+                                                    <Image Source="{Binding Icon}"
+                                                           Width="32"
+                                                           Height="32"
+                                                           Stretch="UniformToFill" />
+                                                </Border>
+                                                <Border CornerRadius="7"
+                                                        Background="#2400A3FF"
+                                                        IsVisible="{Binding !HasIcon}">
+                                                    <TextBlock Text="{Binding Initial}"
+                                                               FontWeight="Bold"
+                                                               FontSize="14"
+                                                               Foreground="{StaticResource AppAccent}"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" />
+                                                </Border>
+                                            </Panel>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Name}"
+                                                       FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       VerticalAlignment="Center" />
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding ChannelLabel}"
+                                                       IsVisible="{Binding HasChannelLabel}"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource AppAccent}"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock x:Name="EmptyGamesText"
+                                   Text="No Unreal games found in Steam. Add one manually using the button below."
+                                   Foreground="{StaticResource AppFaint}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Margin="24"
+                                   IsHitTestVisible="False" />
+                    </Panel>
+                </Border>
+            </Grid>
+
+            <Button x:Name="AddGameManuallyButton"
+                    Grid.Row="1"
+                    Classes="ghost"
+                    Content="Add Game Manually"
+                    HorizontalAlignment="Right"
+                    Click="OnAddGameManuallyClick" />
+
+            <StackPanel x:Name="ManualAddPanel"
+                        Grid.Row="2"
+                        Spacing="8"
+                        IsVisible="False">
+                <TextBlock Text="Game folder"
+                           Foreground="{StaticResource AppMuted}"
+                           FontSize="12" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <TextBox x:Name="PathTextBox"
+                             Grid.Column="0"
+                             PlaceholderText="e.g. D:\SteamLibrary\steamapps\common\Asterigos"
+                             KeyDown="OnPathTextBoxKeyDown"
+                             LostFocus="OnPathTextBoxLostFocus" />
+                    <Button x:Name="BrowseButton"
+                            Grid.Column="1"
+                            Classes="ghost"
+                            Content="Browse"
+                            Click="OnBrowseClick" />
+                </Grid>
+            </StackPanel>
+
+            <StackPanel Grid.Row="3" Spacing="8">
+                <TextBlock Text="UE4SS version"
+                           Foreground="{StaticResource AppMuted}"
+                           FontSize="12" />
+                <ComboBox x:Name="VersionComboBox" SelectedIndex="0">
+                    <ComboBoxItem Content="Release" />
+                    <ComboBoxItem Content="zDev" />
+                </ComboBox>
+                <TextBlock Text="Channel switches stay clean after one install with this app. Manual UE4SS copies can leave leftover files."
+                           Foreground="{StaticResource AppFaint}"
+                           FontSize="11"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
+                <Button x:Name="InstallButton"
+                        Content="Install UE4SS"
+                        Click="OnInstallClick"
+                        IsEnabled="False"
+                        Classes="accent" />
+                <Button x:Name="InstallModButton"
+                        Content="Install Mod Zip"
+                        Click="OnInstallModClick"
+                        IsEnabled="False"
+                        Classes="ghost" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="5" Spacing="8">
+                <TextBlock x:Name="StatusText"
+                           Text="Ready"
+                           Foreground="{StaticResource AppMuted}"
+                           FontSize="12"
+                           TextWrapping="Wrap" />
+                <ProgressBar x:Name="BusyBar"
+                             IsIndeterminate="True"
+                             IsVisible="False" />
+            </StackPanel>
+        </Grid>
+    </Panel>
+</Window>
