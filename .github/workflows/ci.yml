@@ -12,8 +12,10 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    # Job permissions cannot use expressions. Write is only used by
+    # "Create GitHub Release", which is still gated to v* tags below.
     permissions:
-      contents: ${{ startsWith(github.ref, 'refs/tags/v') && 'write' || 'read' }}
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
