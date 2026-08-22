@@ -23,6 +23,7 @@ Those files are downloaded or chosen at the user's request. They are not bundled
 ## Build and signing process
 
 - Official Windows builds come from GitHub Actions on GitHub-hosted `windows-latest` runners (see `.github/workflows/ci.yml`).
+- Release tags use `vMAJOR.MINOR.PATCH` (for example `v1.0.6`). Older GitHub Releases `1.0.0`–`1.0.5` were local publishes and stay as history. The Windows product version is the number without `v`.
 - Only that CI-built `UE4SSInstaller.exe` will be submitted to SignPath.
 - The private key is held by SignPath (HSM-backed). This project does not store a code-signing private key.
 - Every production signing request will be approved by hand.

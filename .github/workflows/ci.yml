@@ -27,7 +27,23 @@ jobs:
         run: dotnet test --configuration Release
 
       - name: Publish win-x64
-        run: dotnet publish UE4SSInstaller.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64
+        shell: pwsh
+        run: |
+          $extra = @()
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $ver = $env:GITHUB_REF_NAME.Substring(1)
+            if ($ver -notmatch '^\d+\.\d+\.\d+$') {
+              throw "Tag '$($env:GITHUB_REF_NAME)' must be vMAJOR.MINOR.PATCH (e.g. v1.0.6)."
+            }
+            $extra = @(
+              "-p:Version=$ver",
+              "-p:AssemblyVersion=$ver.0",
+              "-p:FileVersion=$ver.0",
+              "-p:InformationalVersion=$ver"
+            )
+          }
+          dotnet publish UE4SSInstaller.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64 @extra
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload unsigned exe
         uses: actions/upload-artifact@v4

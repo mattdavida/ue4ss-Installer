@@ -51,8 +51,8 @@ Do not apply the same week as first public traction. A 2026 SignPath decline for
 | Gap | Why it matters | This branch |
 | --- | --- | --- |
 | No GitHub Actions | SignPath origin verification requires the signed bytes to come from a GitHub-hosted workflow, not `deploy.ps1` on a home machine | Workflow added; first public Release still needed |
-| No GitHub Releases | Reviewers want a first-party download URL they can audit. Nexus is fine as a mirror; it is a weak *only* download page | Tag `v0.1.0` on `main` after this merges |
-| No `Version` / `FileVersion` in the exe | SignPath artifact configs enforce product name + version on the PE | Set to `0.1.0` in csproj + `app.manifest` |
+| No GitHub Releases | Reviewers want a first-party download URL they can audit. Nexus is fine as a mirror; it is a weak *only* download page | Tag `v1.0.6` on `main` after the version bump merges. Keep `1.0.0`–`1.0.5` as history. |
+| No `Version` / `FileVersion` in the exe | SignPath artifact configs enforce product name + version on the PE | Set to `1.0.6` in csproj + `app.manifest` |
 | GitHub repo looks empty | 0 stars, 0 forks, no topics, no Releases tab. That is what they open first | Still a you-on-GitHub task (About / topics / 2FA) |
 | MFA on GitHub | Required for every team member. Confirm 2FA is on before you apply | Confirm in GitHub account settings |
 | “No hacking tools” framing | UE4SS loads via `dwmapi.dll`. Reviewers who search the name may treat this as security circumvention unless the application says, plainly, that *this* binary only copies files the user asked for | Stated in `CODE_SIGNING.md` and `SECURITY.md` |
@@ -114,7 +114,7 @@ Mirror a one-line “Code signing policy” link on the Nexus description (`nexu
 
 In `UE4SSInstaller.csproj` (and keep `app.manifest` in sync):
 
-- `Version` / `FileVersion` / `InformationalVersion` — one value per release, e.g. `0.1.0`
+- `Version` / `FileVersion` / `InformationalVersion` — one value per release, e.g. `1.0.6` (no `v` in the PE)
 - `Product` = `UE4SS Installer` (already set)
 - `AssemblyTitle` = `UE4SS Installer` (already set)
 - `Company` = `UE4SS Installer` (project name, not a fake company)
@@ -168,7 +168,7 @@ A formal required-review ruleset is awkward for a solo repo. Do not block yourse
 
 Run in parallel with Phase 1. Do not skip it.
 
-- Publish **v0.1.0** (or whatever the current Nexus build is) from CI so GitHub Releases is not empty.
+- Publish **v1.0.6** from CI (continues from the existing `1.0.5` local release). Leave older tags in place.
 - Upload that exact file to Nexus. One hash, two URLs.
 - Leave the VirusTotal link in the README; refresh it when the hash changes.
 - Keep a private note of Nexus unique downloads and “no malware / no complaints.” You will paste that into the application.
@@ -274,7 +274,7 @@ README already says the Linux build exists and is less tested. Keep saying that 
 2. ~~csproj version + company metadata.~~
 3. ~~`CODE_SIGNING.md` + README / `nexus.txt` links.~~
 4. ~~CI workflow: test, win-x64 publish, tag → GitHub Release + SHA256.~~
-5. Cut `v0.1.0` from `main`, upload that hash to Nexus.
+5. Cut `v1.0.6` from `main`, upload that hash to Nexus. Do not tag `0.1.0` or reuse `1.0.5`.
 6. Repo About / topics (`SECURITY.md` is in this branch).
 7. Wait until the Release has been public a bit and Nexus is still clean.
 8. Submit https://signpath.org/apply.html with the draft above.
