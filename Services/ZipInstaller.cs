@@ -74,6 +74,7 @@ public static class ZipInstaller
             TryDeleteFile(Path.Combine(win64Path, name));
 
         TryDeleteFile(Path.Combine(win64Path, InstallerManifest.FileName));
+        TryDeleteFile(Path.Combine(win64Path, ModsManifest.FileName));
 
         var ue4ssDir = Path.Combine(win64Path, "ue4ss");
         if (Directory.Exists(ue4ssDir))

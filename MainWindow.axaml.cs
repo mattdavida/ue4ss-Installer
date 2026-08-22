@@ -496,10 +496,12 @@ public partial class MainWindow : Window
 
     private void RefreshInstalledMods()
     {
+        InstalledModsCombo.SelectedItem = null;
+        InstalledModsCombo.ItemsSource = null;
+
         if (_win64Path is null)
         {
             InstalledModsPanel.IsVisible = false;
-            InstalledModsCombo.ItemsSource = null;
             return;
         }
 
