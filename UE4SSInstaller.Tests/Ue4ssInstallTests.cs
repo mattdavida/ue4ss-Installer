@@ -71,6 +71,22 @@ public sealed class Ue4ssInstallTests
         Assert.False(File.Exists(Path.Combine(win64, "dwmapi.dll")));
         Assert.False(Directory.Exists(Path.Combine(win64, "ue4ss")));
         Assert.True(File.Exists(saved));
+        Assert.Empty(ModTracker.List(win64));
+    }
+
+    [Fact]
+    public void Uninstall_clears_a_leftover_mods_list_at_win64_root()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+        File.WriteAllText(Path.Combine(win64, ModsManifest.FileName),
+            """{"mods":[{"id":"1","name":"Ghost","kind":"ModsFolder","files":[]}]}""");
+
+        ZipInstaller.UninstallUe4ss(win64);
+
+        Assert.False(File.Exists(Path.Combine(win64, ModsManifest.FileName)));
+        Assert.Empty(ModTracker.List(win64));
     }
 
     [Fact]

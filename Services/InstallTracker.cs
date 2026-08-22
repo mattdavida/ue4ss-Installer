@@ -98,5 +98,6 @@ public static class InstallTracker
     private static bool LooksInstalled(string win64Path)
         => File.Exists(Path.Combine(win64Path, "dwmapi.dll"))
            || File.Exists(Path.Combine(win64Path, "UE4SS.dll"))
-           || File.Exists(Path.Combine(win64Path, "ue4ss", "UE4SS.dll"));
+           || File.Exists(Path.Combine(win64Path, "ue4ss", "UE4SS.dll"))
+           || Directory.Exists(Path.Combine(win64Path, "ue4ss"));
 }

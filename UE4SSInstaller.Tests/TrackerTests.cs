@@ -57,4 +57,13 @@ public sealed class InstallTrackerTests
         Assert.Equal(InstallKind.Managed, state.Kind);
         Assert.Equal(Ue4ssChannel.ZDev, state.Channel);
     }
+
+    [Fact]
+    public void Leftover_ue4ss_folder_without_dlls_still_counts_as_installed()
+    {
+        using var temp = new TempDir();
+        var leftover = temp.Combine("leftover");
+        Directory.CreateDirectory(Path.Combine(leftover, "ue4ss", "Mods"));
+        Assert.Equal(InstallKind.Unmanaged, InstallTracker.Detect(leftover).Kind);
+    }
 }
