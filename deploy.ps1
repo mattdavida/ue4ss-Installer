@@ -1,3 +1,5 @@
+# Local iteration only. Official Windows downloads come from the v* tag job
+# in .github/workflows/ci.yml — do not upload a local publish to Nexus.
 param(
     [switch]$Linux,
     [switch]$All

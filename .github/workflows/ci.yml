@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: ${{ startsWith(github.ref, 'refs/tags/v') && 'write' || 'read' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Test
+        run: dotnet test --configuration Release
+
+      - name: Publish win-x64
+        run: dotnet publish UE4SSInstaller.csproj -c Release -r win-x64 --self-contained true -o publish/win-x64
+
+      - name: Upload unsigned exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: UE4SSInstaller-win-x64
+          path: publish/win-x64/UE4SSInstaller.exe
+          if-no-files-found: error
+
+      - name: Checksums
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash -Algorithm SHA256 "publish/win-x64/UE4SSInstaller.exe").Hash.ToLower()
+          "$hash  UE4SSInstaller.exe" | Set-Content -Encoding ascii "publish/win-x64/SHA256SUMS.txt"
+          Get-Content "publish/win-x64/SHA256SUMS.txt"
+
+      - name: Release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $hash = (Get-Content "publish/win-x64/SHA256SUMS.txt").Trim()
+          @"
+          Windows build of UE4SS Installer ${{ github.ref_name }}.
+
+          This exe is **not code-signed yet**. SmartScreen may show **Windows protected your PC**. Click **More info**, then **Run anyway**.
+
+          Official download: this GitHub Release. [Nexus Mods](https://www.nexusmods.com/mortalshell2/mods/96) is a mirror of the same file.
+
+          [Code signing policy](https://github.com/mattdavida/ue4ss-Installer/blob/main/CODE_SIGNING.md) — pending SignPath Foundation.
+
+          SHA-256: $hash
+          "@ | Set-Content -Encoding utf8 "publish/win-x64/RELEASE_NOTES.md"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create "${{ github.ref_name }}"
+          "publish/win-x64/UE4SSInstaller.exe"
+          "publish/win-x64/SHA256SUMS.txt"
+          --title "${{ github.ref_name }}"
+          --notes-file "publish/win-x64/RELEASE_NOTES.md"
