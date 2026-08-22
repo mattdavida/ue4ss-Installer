@@ -4,7 +4,7 @@ A small desktop app for installing [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS)
 
 This is a community installer. It is not affiliated with Epic Games or the UE4SS project.
 
-The public Windows build is on [Nexus Mods](https://www.nexusmods.com/mortalshell2/mods/96).
+Official Windows builds will be on [GitHub Releases](https://github.com/mattdavida/ue4ss-Installer/releases). [Nexus Mods](https://www.nexusmods.com/mortalshell2/mods/96) is a mirror of the same exe.
 
 <p align="center">
   <img src="Assets/ue4ss-installer-hero.png" alt="UE4SS Installer" width="520" />
@@ -71,6 +71,8 @@ dotnet test
 dotnet run
 ```
 
+Official Windows downloads are produced by `.github/workflows/ci.yml` on a `v*` tag. `deploy.ps1` is for local iteration only — do not upload a local publish as the public build.
+
 Standalone builds (no .NET install on the target machine). One file: `UE4SSInstaller.exe` on Windows, `UE4SSInstaller` on Linux.
 
 ```powershell
@@ -88,10 +90,10 @@ A GitHub account is not required. Listing the UE4SS zip uses GitHub's public API
 
 ## Code signing policy
 
-Windows releases are meant to be signed through [SignPath.io](https://signpath.io/), with a certificate from [SignPath Foundation](https://signpath.org/), once the project is accepted. Until then, the published exe is unsigned and SmartScreen may warn on first run (see above).
+Windows releases are meant to be signed through [SignPath.io](https://signpath.io/), with a certificate from [SignPath Foundation](https://signpath.org/), once the project is accepted. Until then, the published exe is unsigned and SmartScreen may warn on first run (see above). Full policy: [CODE_SIGNING.md](CODE_SIGNING.md).
 
 - Free code signing provided by SignPath.io, certificate by SignPath Foundation
-- Committers, reviewers, and approvers: [mattdavida](https://github.com/mattdavida)
+- Authors, reviewers, and approvers: [mattdavida](https://github.com/mattdavida)
 - This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Choosing **Install UE4SS** or a known signature pack downloads files from GitHub at your request.
 
 ## Credits
