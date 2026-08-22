@@ -41,6 +41,7 @@ Currently included:
 
 - [Mortal Shell II](https://github.com/mattdavida/MortalShell2-UE4SS-Fix) (`StaticConstructObject.lua`)
 - [Witchfire](https://github.com/mattdavida/Witchfire-ue4ss-fix) (`ConsoleManager.lua`, plus `EngineVersionOverride` 4.27 in `UE4SS-settings.ini`)
+- [Wuchang: Fallen Feathers](https://github.com/mattdavida/Wuchang-UE4SS-Fix) (`ConsoleManager.lua`, plus `HookInitGameState = 0` in `UE4SS-settings.ini`)
 
 Signature files are not added to the UE4SS manifest, so a later channel switch will not delete them. They are overwritten on the next install.
 

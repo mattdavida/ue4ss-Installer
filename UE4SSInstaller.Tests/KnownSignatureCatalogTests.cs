@@ -22,6 +22,14 @@ public sealed class KnownSignatureCatalogTests
     }
 
     [Fact]
+    public void Matches_Wuchang_by_app_id_and_includes_hook_patches()
+    {
+        var pack = KnownSignatureCatalog.Find("2277560", "Something Else", null, null);
+        Assert.Equal("Wuchang-UE4SS-Fix", pack?.Repo);
+        Assert.Equal(new IniPatch("Hooks", "HookInitGameState", "0"), Assert.Single(pack!.IniPatches));
+    }
+
+    [Fact]
     public void Unknown_games_have_no_pack()
     {
         Assert.Null(KnownSignatureCatalog.Find("1", "Asterigos: Curse of the Stars", @"D:\Steam\Asterigos", null));
