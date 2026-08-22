@@ -11,7 +11,10 @@ public sealed class KnownSignaturePack
     public int? EngineMajorVersion { get; init; }
     public int? EngineMinorVersion { get; init; }
     public bool HasEngineVersionOverride => EngineMajorVersion is not null && EngineMinorVersion is not null;
+    public IniPatch[] IniPatches { get; init; } = [];
 }
+
+public sealed record IniPatch(string Section, string Key, string Value);
 
 /// <summary>
 /// Game-specific UE4SS signature packs. Matched by Steam app id, then name, then folder.
@@ -40,6 +43,19 @@ public static class KnownSignatureCatalog
             FolderNames = ["Witchfire"],
             EngineMajorVersion = 4,
             EngineMinorVersion = 27
+        },
+        new KnownSignaturePack
+        {
+            DisplayName = "Wuchang: Fallen Feathers signatures",
+            Owner = "mattdavida",
+            Repo = "Wuchang-UE4SS-Fix",
+            SteamAppId = "2277560",
+            NameContains = ["Wuchang", "Fallen Feathers"],
+            FolderNames = ["Wuchang Fallen Feathers", "WUCHANG Fallen Feathers"],
+            IniPatches =
+            [
+                new("Hooks", "HookInitGameState", "0")
+            ]
         }
     ];
 

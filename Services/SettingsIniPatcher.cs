@@ -38,6 +38,32 @@ public static class SettingsIniPatcher
         File.WriteAllLines(path, lines, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
     }
 
+    public static void ApplyPatches(string win64Path, IReadOnlyList<IniPatch> patches)
+    {
+        if (patches.Count == 0)
+            return;
+
+        var path = FindSettingsPath(win64Path)
+                   ?? throw new InvalidOperationException("UE4SS-settings.ini was not found.");
+
+        var lines = File.ReadAllLines(path).ToList();
+        foreach (var patch in patches)
+        {
+            var section = IndexOfSection(lines, patch.Section);
+            if (section < 0)
+            {
+                if (lines.Count > 0 && !string.IsNullOrWhiteSpace(lines[^1]))
+                    lines.Add("");
+                lines.Add($"[{patch.Section}]");
+                section = lines.Count - 1;
+            }
+
+            SetKeyInSection(lines, section, patch.Key, patch.Value);
+        }
+
+        File.WriteAllLines(path, lines, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
+
     private static int IndexOfSection(List<string> lines, string section)
     {
         var header = $"[{section}]";

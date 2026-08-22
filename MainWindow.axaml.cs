@@ -229,6 +229,11 @@ public partial class MainWindow : Window
                 try
                 {
                     var dest = await Task.Run(() => ZipInstaller.InstallSignaturePack(signatureZip, win64Path));
+                    if (pack.IniPatches.Length > 0)
+                    {
+                        await Task.Run(() => SettingsIniPatcher.ApplyPatches(win64Path, pack.IniPatches));
+                    }
+
                     if (pack.HasEngineVersionOverride)
                     {
                         await Task.Run(() => SettingsIniPatcher.ApplyEngineVersion(
