@@ -9,3 +9,7 @@ Tested on Windows. A Linux / Steam Deck build exists but has not been tested as 
 Windows may show "Windows protected your PC" on first run because the exe is not code-signed yet. Click More info, then Run anyway. Antivirus may also flag dwmapi.dll next to the game — that file is how UE4SS loads.
 
 This is a community tool. It is not affiliated with Epic Games or the UE4SS project.
+
+Credits
+Source: https://github.com/mattdavida/ue4ss-Installer
+UE4SS: https://github.com/UE4SS-RE/RE-UE4SS

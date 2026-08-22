@@ -4,6 +4,8 @@ A small desktop app for installing [UE4SS](https://github.com/UE4SS-RE/RE-UE4SS)
 
 This is a community installer. It is not affiliated with Epic Games or the UE4SS project.
 
+The public Windows build is on [Nexus Mods](https://www.nexusmods.com/mortalshell2/mods/96).
+
 <p align="center">
   <img src="Assets/ue4ss-installer-hero.png" alt="UE4SS Installer" width="520" />
 </p>
@@ -14,7 +16,7 @@ This app is not code-signed yet, so Windows SmartScreen often shows **Windows pr
 
 Antivirus tools sometimes flag `dwmapi.dll` next to a game exe. UE4SS loads that way on purpose. It is not extra software this installer invented.
 
-A VirusTotal scan of the published exe will be linked here (and on the GitHub release) once a public build is posted.
+This build on VirusTotal: [scan](https://www.virustotal.com/gui/file/86d7157073bb4783a7fe96593eb1188814f3188755b28583fb31cbd3061ed5a2) (one heuristic hit is common for a new unsigned exe). Nexus also scanned the upload.
 
 ## Use it
 
@@ -82,6 +84,14 @@ Linux output: `bin/Release/net9.0/linux-x64/publish/UE4SSInstaller`
 Copy that file anywhere and run it. First launch unpacks native graphics libs into a cache, so it can take a few extra seconds.
 
 A GitHub account is not required. Listing the UE4SS zip uses GitHub's public API (about 60 requests per hour per IP, unauthenticated). The zip download itself does not use that quota. Optional: set `UE4SS_INSTALLER_GITHUB_TOKEN` to a token with public-repo read if you hit that listing limit on a shared network. Do not put a token in the shipped exe.
+
+## Code signing policy
+
+Windows releases are meant to be signed through [SignPath.io](https://signpath.io/), with a certificate from [SignPath Foundation](https://signpath.org/), once the project is accepted. Until then, the published exe is unsigned and SmartScreen may warn on first run (see above).
+
+- Free code signing provided by SignPath.io, certificate by SignPath Foundation
+- Committers, reviewers, and approvers: [mattdavida](https://github.com/mattdavida)
+- This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. Choosing **Install UE4SS** or a known signature pack downloads files from GitHub at your request.
 
 ## Credits
 
