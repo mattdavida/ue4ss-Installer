@@ -38,4 +38,25 @@ public sealed class PathDetectorTests
         var exe = PathDetector.FindGameExecutable(win64);
         Assert.Equal("MyGame-Win64-Shipping.exe", Path.GetFileName(exe));
     }
+
+    [Fact]
+    public void Accepts_Binaries_Win64_when_that_folder_is_picked()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("MortalShell2", "Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        var found = PathDetector.FindWin64Directory(win64);
+        Assert.Equal(Path.GetFullPath(win64), found);
+    }
+
+    [Fact]
+    public void Rejects_Engine_Win64_when_that_folder_is_picked()
+    {
+        using var temp = new TempDir();
+        var engineWin64 = temp.Combine("Engine", "Binaries", "Win64");
+        Directory.CreateDirectory(engineWin64);
+
+        Assert.Null(PathDetector.FindWin64Directory(engineWin64));
+    }
 }

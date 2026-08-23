@@ -28,6 +28,8 @@ public static class SteamScanner
         @"^\s*""appid""\s+""(.+)""\s*$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    internal static string? TryFindSteamPath() => FindSteamInstallPath();
+
     public static IReadOnlyList<DetectedGame> FindUnrealGames()
     {
         var steamPath = FindSteamInstallPath();
@@ -271,6 +273,56 @@ public static class SteamScanner
         installDir = parsedInstallDir.Trim();
         appId = parsedAppId?.Trim() ?? string.Empty;
         return name.Length > 0 && installDir.Length > 0;
+    }
+
+    internal static bool TryIdentifyCommonInstall(string installPath, out string displayName, out string appId)
+    {
+        displayName = string.Empty;
+        appId = string.Empty;
+
+        string steamapps;
+        try
+        {
+            var common = Directory.GetParent(Path.GetFullPath(installPath));
+            var parent = common?.Parent;
+            if (parent is null || !parent.Name.Equals("steamapps", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            steamapps = parent.FullName;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        var installDir = Path.GetFileName(installPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (string.IsNullOrWhiteSpace(installDir) || !Directory.Exists(steamapps))
+            return false;
+
+        IEnumerable<string> manifests;
+        try
+        {
+            manifests = Directory.EnumerateFiles(steamapps, "appmanifest_*.acf");
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        foreach (var manifest in manifests)
+        {
+            if (!TryReadManifest(manifest, out var name, out var dir, out var parsedAppId))
+                continue;
+
+            if (!dir.Equals(installDir, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            displayName = name;
+            appId = parsedAppId;
+            return displayName.Length > 0;
+        }
+
+        return false;
     }
 
     private static string UnescapeVdf(string value)
