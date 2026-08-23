@@ -178,10 +178,47 @@ public partial class MainWindow : Window
 
         _win64Path = win64;
         PathTextBox.Text = win64;
+        EnsureGameInList(gameInstallPath, win64);
         SyncListSelection();
         RefreshInstalledMods();
         UpdateActionButtons();
         ShowInstallStatus();
+    }
+
+    private void EnsureGameInList(string pickedPath, string win64Path)
+    {
+        var existing = _allGames.FirstOrDefault(game =>
+            string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+            return;
+
+        var identity = ManualGameResolver.Resolve(pickedPath, win64Path);
+        var exePath = PathDetector.FindGameExecutable(win64Path);
+        var steamPath = SteamScanner.TryFindSteamPath();
+        var artwork = steamPath is null
+            ? null
+            : GameIconLoader.FindSteamArtwork(steamPath, identity.AppId);
+        var state = InstallTracker.Detect(win64Path);
+        var channelLabel = state.Kind == InstallKind.Managed
+            ? (state.Channel == Ue4ssChannel.ZDev ? "zDev" : "Release")
+            : null;
+
+        _allGames.Add(new DetectedGame
+        {
+            Name = identity.Name,
+            InstallPath = identity.InstallPath,
+            Win64Path = win64Path,
+            ExePath = exePath,
+            AppId = string.IsNullOrEmpty(identity.AppId) ? null : identity.AppId,
+            Icon = GameIconLoader.Load(exePath, artwork),
+            ChannelLabel = channelLabel
+        });
+        _allGames.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(SearchTextBox.Text))
+            SearchTextBox.Text = string.Empty;
+
+        ApplyGameFilter();
     }
 
     private async void OnInstallClick(object? sender, RoutedEventArgs e)
