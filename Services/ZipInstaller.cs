@@ -390,6 +390,12 @@ public static class ZipInstaller
         return combined;
     }
 
+    internal static ModPackageKind PeekModZipKind(string zipPath)
+    {
+        using var archive = ZipFile.OpenRead(zipPath);
+        return InspectModZip(archive).Kind;
+    }
+
     internal static ModZipLayout InspectModZip(ZipArchive archive)
     {
         var relatives = archive.Entries

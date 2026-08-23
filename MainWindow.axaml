@@ -275,10 +275,11 @@
                                 HorizontalAlignment="Right">
                         <Button Content="Cancel"
                                 Classes="ghost"
-                                Click="OnUninstallCancelClick" />
-                        <Button Content="Uninstall"
+                                Click="OnConfirmCancelClick" />
+                        <Button x:Name="ConfirmActionButton"
+                                Content="Uninstall"
                                 Classes="accent"
-                                Click="OnUninstallConfirmClick" />
+                                Click="OnConfirmActionClick" />
                     </StackPanel>
                 </StackPanel>
             </Border>

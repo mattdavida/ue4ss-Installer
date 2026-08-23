@@ -75,4 +75,18 @@ public sealed class InspectModZipTests
         Assert.Equal(ModPackageKind.ModsFolder, layout.Kind);
         Assert.Null(layout.StripPrefix);
     }
+
+    [Fact]
+    public void Peek_from_path_matches_inspect()
+    {
+        using var temp = new TempDir();
+        var pack = TestZip.Create(temp.Path,
+            ("dwmapi.dll", "proxy"),
+            ("ue4ss/UE4SS.dll", "core"));
+        var loose = TestZip.Create(temp.Path,
+            ("MyMod/Scripts/main.lua", "print('hi')"));
+
+        Assert.Equal(ModPackageKind.GameDirectory, ZipInstaller.PeekModZipKind(pack));
+        Assert.Equal(ModPackageKind.ModsFolder, ZipInstaller.PeekModZipKind(loose));
+    }
 }
