@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private bool _busy;
     private bool _applyingSelection;
     private InstalledMod? _pendingModUninstall;
+    private string? _pendingModZip;
 
     public MainWindow()
     {
@@ -299,27 +300,46 @@ public partial class MainWindow : Window
             return;
 
         _pendingModUninstall = null;
+        _pendingModZip = null;
         ConfirmTitle.Text = "Uninstall UE4SS?";
         ConfirmBody.Text =
             "This deletes the ue4ss folder (including mods and signatures) and UE4SS DLLs in Win64 such as dwmapi.dll.";
+        ConfirmActionButton.Content = "Uninstall";
         UninstallConfirmOverlay.IsVisible = true;
     }
 
-    private void OnUninstallCancelClick(object? sender, RoutedEventArgs e)
+    private void OnConfirmCancelClick(object? sender, RoutedEventArgs e)
     {
         UninstallConfirmOverlay.IsVisible = false;
         _pendingModUninstall = null;
+        _pendingModZip = null;
     }
 
-    private async void OnUninstallConfirmClick(object? sender, RoutedEventArgs e)
+    private async void OnConfirmActionClick(object? sender, RoutedEventArgs e)
     {
         UninstallConfirmOverlay.IsVisible = false;
         if (_win64Path is null || _busy)
             return;
 
         var win64Path = _win64Path;
+        var zipPath = _pendingModZip;
         var mod = _pendingModUninstall;
+        _pendingModZip = null;
         _pendingModUninstall = null;
+
+        if (zipPath is not null)
+        {
+            await RunBusyAsync("Installing...", async () =>
+            {
+                var result = await Task.Run(() => ZipInstaller.InstallMod(zipPath, win64Path));
+                RefreshInstalledMods();
+                var where = result.Kind == ModPackageKind.GameDirectory
+                    ? "the game folder (UE4SS pack / overlay)"
+                    : "the Mods folder";
+                SetStatus($"Installed {result.Name} into {where}.");
+            });
+            return;
+        }
 
         if (mod is not null)
         {
@@ -364,16 +384,31 @@ public partial class MainWindow : Window
             return;
         }
 
-        var win64Path = _win64Path;
-        await RunBusyAsync("Extracting...", async () =>
+        _pendingModUninstall = null;
+        _pendingModZip = zipPath;
+        var name = Path.GetFileNameWithoutExtension(zipPath);
+        if (string.IsNullOrWhiteSpace(name))
+            name = "this mod";
+
+        ConfirmTitle.Text = $"Install {name}?";
+        ConfirmBody.Text = DescribeModZip(zipPath, name);
+        ConfirmActionButton.Content = "Install";
+        UninstallConfirmOverlay.IsVisible = true;
+    }
+
+    private static string DescribeModZip(string zipPath, string name)
+    {
+        try
         {
-            var result = await Task.Run(() => ZipInstaller.InstallMod(zipPath, win64Path));
-            RefreshInstalledMods();
-            var where = result.Kind == ModPackageKind.GameDirectory
-                ? "the game folder (UE4SS pack / overlay)"
-                : "the Mods folder";
-            SetStatus($"Installed {result.Name} into {where}.");
-        });
+            var kind = ZipInstaller.PeekModZipKind(zipPath);
+            return kind == ModPackageKind.GameDirectory
+                ? $"This installs {name} into the game folder. You can uninstall it later from Installed mods."
+                : $"This installs {name} into the Mods folder. You can uninstall it later from Installed mods.";
+        }
+        catch
+        {
+            return $"This installs {name} into the selected game. You can uninstall it later from Installed mods.";
+        }
     }
 
     private void OnUninstallModClick(object? sender, RoutedEventArgs e)
@@ -384,10 +419,12 @@ public partial class MainWindow : Window
         if (InstalledModsCombo.SelectedItem is not InstalledMod mod)
             return;
 
+        _pendingModZip = null;
         _pendingModUninstall = mod;
         ConfirmTitle.Text = $"Remove {mod.Name}?";
         ConfirmBody.Text =
             "This deletes the files this app installed for that mod. UE4SS itself is left alone.";
+        ConfirmActionButton.Content = "Uninstall";
         UninstallConfirmOverlay.IsVisible = true;
     }
 
