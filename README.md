@@ -27,6 +27,8 @@ This build on VirusTotal: [scan](https://www.virustotal.com/gui/file/86d7157073b
 
 **Release** is the newest `UE4SS_v*.zip` on the `experimental-latest` tag. **zDev** is the newest `zDEV-UE4SS_v*.zip` from that same tag. GitHub’s `/releases/latest` is not used; that channel is currently frozen.
 
+Mortal Shell II is pinned to Git SHA `d7e7826d` (build 1028). Later experimental zips break tarstone Lua on that game. `experimental-latest` only keeps the newest build, so that pin is downloaded from the `experimental` archive tag. Witchfire, Wuchang, and unknown titles still get the newest zip.
+
 After one install with this app, switching channels cleans files this installer previously extracted. Manual UE4SS copies are not tracked, so leftovers can remain until you install once through the app.
 
 Same-channel updates keep `UE4SS-settings.ini`. Switching Release ↔ zDev overwrites it. Mods you added that are not in the UE4SS zip are left alone.

@@ -404,7 +404,8 @@ public partial class MainWindow : Window
 
         await RunBusyAsync("Downloading...", async () =>
         {
-            var zipPath = await GitHubFetcher.DownloadAsync(channel);
+            var pack = FindSignaturePack(win64Path);
+            var zipPath = await GitHubFetcher.DownloadAsync(channel, pack?.PinnedUe4ssGitSha);
             try
             {
                 SetStatus("Extracting...");
@@ -417,7 +418,6 @@ public partial class MainWindow : Window
 
             MarkManagedChannel(win64Path, channel);
 
-            var pack = FindSignaturePack(win64Path);
             if (pack is null)
             {
                 SetStatus($"Installed {FormatChannel(channel)}. {InstallTracker.Detect(win64Path).StatusText}");
@@ -450,7 +450,10 @@ public partial class MainWindow : Window
                             pack.EngineMinorVersion!.Value));
                     }
 
-                    SetStatus($"Installed {FormatChannel(channel)} and {pack.DisplayName} into {dest}.");
+                    var pinNote = pack.HasPinnedUe4ss
+                        ? $" (UE4SS {pack.PinnedUe4ssGitSha})"
+                        : "";
+                    SetStatus($"Installed {FormatChannel(channel)}{pinNote} and {pack.DisplayName} into {dest}.");
                 }
                 finally
                 {

@@ -11,6 +11,11 @@ public sealed class KnownSignaturePack
     public int? EngineMajorVersion { get; init; }
     public int? EngineMinorVersion { get; init; }
     public bool HasEngineVersionOverride => EngineMajorVersion is not null && EngineMinorVersion is not null;
+    /// <summary>
+    /// When set, Install UE4SS downloads this Git SHA from experimental-latest instead of the newest zip.
+    /// </summary>
+    public string? PinnedUe4ssGitSha { get; init; }
+    public bool HasPinnedUe4ss => !string.IsNullOrWhiteSpace(PinnedUe4ssGitSha);
     public IniPatch[] IniPatches { get; init; } = [];
 }
 
@@ -31,7 +36,9 @@ public static class KnownSignatureCatalog
             Repo = "MortalShell2-UE4SS-Fix",
             SteamAppId = "2584270",
             NameContains = ["Mortal Shell II", "Mortal Shell 2"],
-            FolderNames = ["MortalShell2", "MortalShellII", "Mortal Shell II"]
+            FolderNames = ["MortalShell2", "MortalShellII", "Mortal Shell II"],
+            // experimental after d7e7826d (#1387 FSoftObjectPath / #1389 SDK generator) AVs on tarstone DTs.
+            PinnedUe4ssGitSha = "d7e7826d"
         },
         new KnownSignaturePack
         {
