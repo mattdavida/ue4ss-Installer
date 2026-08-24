@@ -11,12 +11,14 @@ public enum Ue4ssChannel
 }
 
 /// <summary>
-/// Downloads UE4SS from the <c>experimental-latest</c> GitHub release only.
-/// That tag keeps historical assets, so we pick the newest matching zip by date.
+/// Downloads UE4SS from GitHub. Newest zip comes from <c>experimental-latest</c>.
+/// That tag only keeps the current build. A Git SHA pin falls back to the
+/// <c>experimental</c> archive, which still has older zips such as <c>d7e7826d</c>.
 /// </summary>
 public static class GitHubFetcher
 {
     private const string ExperimentalLatestUrl = "https://api.github.com/repos/UE4SS-RE/RE-UE4SS/releases/tags/experimental-latest";
+    private const string ExperimentalArchiveUrl = "https://api.github.com/repos/UE4SS-RE/RE-UE4SS/releases/tags/experimental";
 
     private static readonly Regex SafeRepoPart = new(
         @"^[A-Za-z0-9_.-]+$",
@@ -29,19 +31,39 @@ public static class GitHubFetcher
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
     };
 
-    public static async Task<string> DownloadAsync(Ue4ssChannel channel, CancellationToken cancellationToken = default)
+    public static async Task<string> DownloadAsync(
+        Ue4ssChannel channel,
+        string? pinnedGitSha = null,
+        CancellationToken cancellationToken = default)
     {
-        using var response = await Http.GetAsync(ExperimentalLatestUrl, cancellationToken);
+        var release = await GetReleaseAsync(ExperimentalLatestUrl, cancellationToken);
+        var asset = SelectAsset(release.Assets, channel, pinnedGitSha);
+
+        if (asset is null && pinnedGitSha is not null)
+        {
+            release = await GetReleaseAsync(ExperimentalArchiveUrl, cancellationToken);
+            asset = SelectAsset(release.Assets, channel, pinnedGitSha);
+        }
+
+        if (asset is null)
+        {
+            var pin = NormalizeGitSha(pinnedGitSha);
+            throw new InvalidOperationException(pin is null
+                ? $"No matching {channel} zip was found on experimental-latest."
+                : $"Pinned UE4SS {pin} was not found on experimental-latest or experimental for {channel}.");
+        }
+
+        return await DownloadAssetAsync(asset, cancellationToken);
+    }
+
+    private static async Task<GitHubRelease> GetReleaseAsync(string url, CancellationToken cancellationToken)
+    {
+        using var response = await Http.GetAsync(url, cancellationToken);
         EnsureApiSuccess(response);
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var release = await JsonSerializer.DeserializeAsync<GitHubRelease>(stream, JsonOptions, cancellationToken)
-                      ?? throw new InvalidOperationException("GitHub returned an empty release payload.");
-
-        var asset = SelectAsset(release.Assets, channel)
-                    ?? throw new InvalidOperationException($"No matching {channel} zip was found on experimental-latest.");
-
-        return await DownloadAssetAsync(asset, cancellationToken);
+        return await JsonSerializer.DeserializeAsync<GitHubRelease>(stream, JsonOptions, cancellationToken)
+               ?? throw new InvalidOperationException("GitHub returned an empty release payload.");
     }
 
     public static async Task<string> DownloadLatestReleaseZipAsync(
@@ -117,16 +139,39 @@ public static class GitHubFetcher
         throw new IOException("Download didn't finish. Try again.");
     }
 
-    internal static GitHubAsset? SelectAsset(IReadOnlyList<GitHubAsset> assets, Ue4ssChannel channel)
+    internal static GitHubAsset? SelectAsset(
+        IReadOnlyList<GitHubAsset> assets,
+        Ue4ssChannel channel,
+        string? pinnedGitSha = null)
     {
         IEnumerable<GitHubAsset> matches = channel == Ue4ssChannel.ZDev
             ? assets.Where(a => IsZDevZip(a.Name))
             : assets.Where(a => IsReleaseZip(a.Name));
 
+        var pin = NormalizeGitSha(pinnedGitSha);
+        if (pin is not null)
+        {
+            var needle = "-g" + pin;
+            matches = matches.Where(a =>
+                a.Name.Contains(needle, StringComparison.OrdinalIgnoreCase));
+        }
+
         return matches
             .OrderByDescending(a => a.UpdatedAt)
             .ThenByDescending(a => a.CreatedAt)
             .FirstOrDefault();
+    }
+
+    internal static string? NormalizeGitSha(string? sha)
+    {
+        if (string.IsNullOrWhiteSpace(sha))
+            return null;
+
+        sha = sha.Trim();
+        if (sha.StartsWith("g", StringComparison.OrdinalIgnoreCase) && sha.Length > 1)
+            sha = sha[1..];
+
+        return sha.ToLowerInvariant();
     }
 
     // e.g. UE4SS_v3.0.1-1028-gd7e7826d.zip — never zDEV- or helper zips.

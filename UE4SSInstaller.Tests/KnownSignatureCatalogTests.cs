@@ -9,6 +9,8 @@ public sealed class KnownSignatureCatalogTests
     {
         var pack = KnownSignatureCatalog.Find("2584270", "Something Else", null, null);
         Assert.Equal("MortalShell2-UE4SS-Fix", pack?.Repo);
+        Assert.Equal("d7e7826d", pack?.PinnedUe4ssGitSha);
+        Assert.True(pack?.HasPinnedUe4ss);
     }
 
     [Fact]
@@ -17,6 +19,7 @@ public sealed class KnownSignatureCatalogTests
         var pack = KnownSignatureCatalog.Find(null, "Witchfire", null, null);
         Assert.Equal("Witchfire-ue4ss-fix", pack?.Repo);
         Assert.True(pack?.HasEngineVersionOverride);
+        Assert.False(pack?.HasPinnedUe4ss);
         Assert.Equal(4, pack?.EngineMajorVersion);
         Assert.Equal(27, pack?.EngineMinorVersion);
     }
@@ -26,6 +29,7 @@ public sealed class KnownSignatureCatalogTests
     {
         var pack = KnownSignatureCatalog.Find("2277560", "Something Else", null, null);
         Assert.Equal("Wuchang-UE4SS-Fix", pack?.Repo);
+        Assert.False(pack?.HasPinnedUe4ss);
         Assert.Equal(new IniPatch("Hooks", "HookInitGameState", "0"), Assert.Single(pack!.IniPatches));
     }
 

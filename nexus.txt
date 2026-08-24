@@ -4,6 +4,8 @@ Pick a Steam title, choose Release or zDev, and install. You can also drop in a 
 
 It downloads the current UE4SS experimental-latest build for you, so you do not have to check GitHub or unpack files by hand. One exe.
 
+Mortal Shell II is pinned to a known-good UE4SS build (d7e7826d). Newer experimental GitHub zips currently break that game with the UE4SS Cheat Menu installed. Other titles still get the newest zip.
+
 Tested on Windows. A Linux / Steam Deck build exists but has not been tested as thoroughly.
 
 Windows may show "Windows protected your PC" on first run because the exe is not code-signed yet. Click More info, then Run anyway. Antivirus may also flag dwmapi.dll next to the game — that file is how UE4SS loads.
