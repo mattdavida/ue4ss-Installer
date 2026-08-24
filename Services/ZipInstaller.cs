@@ -7,7 +7,9 @@ public static class ZipInstaller
     /// <summary>
     /// Extracts the UE4SS zip into <c>Binaries/Win64</c>, then removes files from the previous
     /// installer-owned manifest that are not in this zip (zDev → Release leftover cleanup).
-    /// Same-channel updates keep an existing <c>UE4SS-settings.ini</c>. Channel switches overwrite it.
+    /// A single wrapper folder (for example Palworld's <c>UE4SS-Palworld_zDev/</c>) is stripped
+    /// so <c>dwmapi.dll</c> and <c>ue4ss/</c> land in Win64. Same-channel updates keep an
+    /// existing <c>UE4SS-settings.ini</c>. Channel switches overwrite it.
     /// </summary>
     public static void InstallUe4ss(string zipPath, string win64Path, Ue4ssChannel channel)
     {
@@ -50,6 +52,8 @@ public static class ZipInstaller
     public static void UninstallUe4ss(string win64Path)
     {
         var manifest = InstallTracker.TryLoad(win64Path);
+        var parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var win64Full = Path.GetFullPath(win64Path);
 
         if (manifest is not null)
         {
@@ -67,6 +71,9 @@ public static class ZipInstaller
                     continue;
 
                 TryDeleteFile(dest);
+                var parent = Path.GetDirectoryName(dest);
+                if (!string.IsNullOrEmpty(parent))
+                    parents.Add(parent);
             }
         }
 
@@ -79,6 +86,9 @@ public static class ZipInstaller
         var ue4ssDir = Path.Combine(win64Path, "ue4ss");
         if (Directory.Exists(ue4ssDir))
             Directory.Delete(ue4ssDir, recursive: true);
+
+        foreach (var dir in parents.OrderByDescending(p => p.Length))
+            TryDeleteEmptyAncestors(dir, win64Full);
     }
 
     private static void TryDeleteFile(string path)
@@ -270,10 +280,16 @@ public static class ZipInstaller
     {
         var extracted = new List<string>();
         using var archive = ZipFile.OpenRead(zipPath);
+        var layout = InspectModZip(archive);
+        var stripPrefix = layout.Kind == ModPackageKind.GameDirectory ? layout.StripPrefix : null;
 
         foreach (var entry in archive.Entries)
         {
             var relative = NormalizeRelative(entry.FullName);
+            if (relative.Length == 0)
+                continue;
+
+            relative = StripPrefix(relative, stripPrefix);
             if (relative.Length == 0 || IsJunkPath(relative))
                 continue;
 

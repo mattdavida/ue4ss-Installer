@@ -104,4 +104,54 @@ public sealed class Ue4ssInstallTests
         Assert.False(File.Exists(temp.Combine("escaped.txt")));
         Assert.True(File.Exists(Path.Combine(win64, "dwmapi.dll")));
     }
+
+    [Fact]
+    public void Unwraps_a_zdev_wrapper_folder_into_win64()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        var zip = TestZip.Create(temp.Path,
+            ("UE4SS-Palworld_zDev/dwmapi.dll", "proxy"),
+            ("UE4SS-Palworld_zDev/ue4ss/UE4SS.dll", "core"),
+            ("UE4SS-Palworld_zDev/ue4ss/UE4SS-settings.ini", "GuiEnabled = 1"));
+        ZipInstaller.InstallUe4ss(zip, win64, Ue4ssChannel.ZDev);
+
+        Assert.True(File.Exists(Path.Combine(win64, "dwmapi.dll")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "UE4SS.dll")));
+        Assert.False(Directory.Exists(Path.Combine(win64, "UE4SS-Palworld_zDev")));
+
+        var manifest = InstallTracker.TryLoad(win64);
+        Assert.Contains("dwmapi.dll", manifest!.Files);
+        Assert.DoesNotContain(manifest.Files, f => f.StartsWith("UE4SS-Palworld_zDev", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Uninstall_removes_a_leftover_wrapper_folder_from_an_old_manifest()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        var wrapper = Path.Combine(win64, "UE4SS-Palworld_zDev");
+        var nestedUe4ss = Path.Combine(wrapper, "ue4ss");
+        Directory.CreateDirectory(nestedUe4ss);
+        File.WriteAllText(Path.Combine(wrapper, "dwmapi.dll"), "proxy");
+        File.WriteAllText(Path.Combine(nestedUe4ss, "UE4SS.dll"), "core");
+        Directory.CreateDirectory(Path.Combine(win64, "ue4ss"));
+        InstallTracker.Save(win64, new InstallerManifest
+        {
+            Channel = Ue4ssChannel.ZDev,
+            Files =
+            [
+                "UE4SS-Palworld_zDev/dwmapi.dll",
+                "UE4SS-Palworld_zDev/ue4ss/UE4SS.dll"
+            ]
+        });
+
+        ZipInstaller.UninstallUe4ss(win64);
+
+        Assert.False(Directory.Exists(wrapper));
+        Assert.False(Directory.Exists(Path.Combine(win64, "ue4ss")));
+        Assert.False(File.Exists(Path.Combine(win64, "dwmapi.dll")));
+    }
 }

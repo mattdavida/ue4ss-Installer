@@ -122,4 +122,63 @@ public sealed class GitHubFetcherTests
         GitHubFetcher.EnsureCompleteDownload(file, expectedSize: 0);
         Assert.True(File.Exists(file));
     }
+
+    [Fact]
+    public void Palworld_release_picks_UE4SS_Palworld_zip_not_official_or_zDev()
+    {
+        var assets = new List<GitHubAsset>
+        {
+            new() { Name = "UE4SS_v3.0.1-1088-ga1e7f571.zip", UpdatedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z") },
+            new() { Name = "UE4SS-Palworld_zDev.zip", UpdatedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z") },
+            new() { Name = "UE4SS-Palworld.zip", UpdatedAt = DateTimeOffset.Parse("2026-07-19T00:00:00Z") }
+        };
+
+        var picked = GitHubFetcher.SelectAsset(assets, Ue4ssChannel.Release, style: Ue4ssAssetStyle.Palworld);
+        Assert.Equal("UE4SS-Palworld.zip", picked?.Name);
+    }
+
+    [Fact]
+    public void Palworld_zdev_picks_the_palworld_zDev_zip()
+    {
+        var assets = new List<GitHubAsset>
+        {
+            new() { Name = "zDEV-UE4SS_v3.0.1-1088-ga1e7f571.zip", UpdatedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z") },
+            new() { Name = "UE4SS-Palworld.zip", UpdatedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z") },
+            new() { Name = "UE4SS-Palworld_zDev.zip", UpdatedAt = DateTimeOffset.Parse("2026-07-19T00:00:00Z") }
+        };
+
+        var picked = GitHubFetcher.SelectAsset(assets, Ue4ssChannel.ZDev, style: Ue4ssAssetStyle.Palworld);
+        Assert.Equal("UE4SS-Palworld_zDev.zip", picked?.Name);
+    }
+
+    [Fact]
+    public void Palworld_style_ignores_official_zips()
+    {
+        var assets = new List<GitHubAsset>
+        {
+            new() { Name = "UE4SS_v3.0.1-1088-ga1e7f571.zip", UpdatedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z") },
+            new() { Name = "zDEV-UE4SS_v3.0.1-1088-ga1e7f571.zip", UpdatedAt = DateTimeOffset.Parse("2026-08-24T00:00:00Z") }
+        };
+
+        Assert.Null(GitHubFetcher.SelectAsset(assets, Ue4ssChannel.Release, style: Ue4ssAssetStyle.Palworld));
+        Assert.Null(GitHubFetcher.SelectAsset(assets, Ue4ssChannel.ZDev, style: Ue4ssAssetStyle.Palworld));
+    }
+
+    [Fact]
+    public void Palworld_release_url_uses_the_rolling_community_tag()
+    {
+        Assert.Equal(
+            "https://api.github.com/repos/Okaetsu/RE-UE4SS/releases/tags/experimental-palworld",
+            GitHubFetcher.ReleaseTagUrl(
+                Ue4ssReleaseSource.Palworld.Owner,
+                Ue4ssReleaseSource.Palworld.Repo,
+                Ue4ssReleaseSource.Palworld.Tag));
+    }
+
+    [Fact]
+    public void Release_url_rejects_unsafe_repo_parts()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            GitHubFetcher.ReleaseTagUrl("UE4SS-RE", "RE-UE4SS", "experimental/latest"));
+    }
 }
