@@ -171,5 +171,29 @@
         <Style Selector="Border.infoHint:pointerover Path">
             <Setter Property="Fill" Value="{StaticResource AppMuted}" />
         </Style>
+
+        <Style Selector="Window.handheld Button">
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+
+        <Style Selector="Window.handheld TextBox">
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+
+        <Style Selector="Window.handheld ComboBox">
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+
+        <Style Selector="Window.handheld Border.GameRow">
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+
+        <Style Selector="Window.handheld ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
     </Application.Styles>
 </Application>
