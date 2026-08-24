@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using UE4SSInstaller.Services;
 
 namespace UE4SSInstaller;
@@ -21,18 +22,25 @@ public partial class MainWindow : Window
     private bool _applyingSelection;
     private InstalledMod? _pendingModUninstall;
     private string? _pendingModZip;
+    private bool _isHandheld;
+    private bool _handheldShowActions;
 
     public MainWindow()
     {
         InitializeComponent();
         ApplyChromeInset(WindowDecorationMargin);
+        if (HandheldLayout.ShouldForceExpanded(HandheldLayout.TryMeasurePrimaryDiagonalInches()))
+            WindowState = WindowState.Maximized;
         PropertyChanged += OnWindowPropertyChanged;
+        ApplyLayoutMode();
     }
 
     private void OnWindowPropertyChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
     {
         if (e.Property == WindowDecorationMarginProperty)
             ApplyChromeInset(WindowDecorationMargin);
+        else if (e.Property == WindowStateProperty)
+            ApplyLayoutMode();
     }
 
     private void ApplyChromeInset(Thickness chrome)
@@ -42,6 +50,147 @@ public partial class MainWindow : Window
             chrome.Top + 10,
             Math.Max(20, chrome.Right + 16),
             16);
+    }
+
+    private void ApplyLayoutMode()
+    {
+        var decision = HandheldLayout.Detect(WindowState);
+        _isHandheld = decision.IsHandheld;
+        Classes.Set("handheld", _isHandheld);
+
+        if (LayoutBadge is not null)
+        {
+            LayoutBadge.IsVisible = _isHandheld;
+            LayoutBadge.Text = $"Handheld layout · {decision.Reason}";
+        }
+
+        if (GamesHint is not null)
+        {
+            GamesHint.Text = _isHandheld
+                ? "Tap a game. If it isn't listed, add it manually."
+                : "Click a game below. If it isn't listed, add it manually.";
+        }
+
+        ApplyHandheldPanes();
+        ApplyChromeInset(WindowDecorationMargin);
+        ApplyConfirmLayout();
+    }
+
+    private void ApplyHandheldPanes()
+    {
+        if (GamesSection is null)
+            return;
+
+        if (!_isHandheld)
+            _handheldShowActions = false;
+
+        var showActions = _isHandheld && _handheldShowActions && _win64Path is not null;
+        var showGames = !showActions;
+
+        if (HandheldChrome is not null)
+            HandheldChrome.IsVisible = showActions;
+        GamesSection.IsVisible = showGames;
+        AddGameManuallyButton.IsVisible = showGames;
+        AddGameManuallyButton.HorizontalAlignment = _isHandheld
+            ? Avalonia.Layout.HorizontalAlignment.Stretch
+            : Avalonia.Layout.HorizontalAlignment.Right;
+
+        VersionSection.IsVisible = !_isHandheld || showActions;
+        ActionButtons.IsVisible = !_isHandheld || showActions;
+        StatusSection.IsVisible = !_isHandheld || showActions;
+
+        if (showActions)
+            ManualAddPanel.IsVisible = false;
+
+        ContentRoot.RowDefinitions = showActions
+            ? new RowDefinitions("Auto,Auto,Auto,Auto,Auto,Auto,Auto")
+            : new RowDefinitions("*,Auto,Auto,Auto,Auto,Auto,Auto");
+
+        ApplyInstalledModsVisibility();
+        if (showActions)
+            RefreshSelectedGameTitle();
+    }
+
+    private void ApplyInstalledModsVisibility()
+    {
+        if (InstalledModsPanel is null)
+            return;
+
+        var showActions = _isHandheld && _handheldShowActions && _win64Path is not null;
+        if (_isHandheld && !showActions)
+        {
+            InstalledModsPanel.IsVisible = false;
+            return;
+        }
+
+        InstalledModsPanel.IsVisible = _win64Path is not null;
+    }
+
+    private void ApplyConfirmLayout()
+    {
+        if (ConfirmCard is null || ConfirmButtons is null)
+            return;
+
+        if (_isHandheld)
+        {
+            ConfirmCard.Width = double.NaN;
+            ConfirmCard.Margin = new Thickness(16);
+            ConfirmCard.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            ConfirmButtons.Orientation = Avalonia.Layout.Orientation.Vertical;
+            ConfirmButtons.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            foreach (var child in ConfirmButtons.Children)
+            {
+                if (child is Control control)
+                    control.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            }
+        }
+        else
+        {
+            ConfirmCard.Width = 380;
+            ConfirmCard.Margin = new Thickness(0);
+            ConfirmCard.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+            ConfirmButtons.Orientation = Avalonia.Layout.Orientation.Horizontal;
+            ConfirmButtons.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
+            foreach (var child in ConfirmButtons.Children)
+            {
+                if (child is Control control)
+                    control.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
+            }
+        }
+    }
+
+    private void OnHandheldBackClick(object? sender, RoutedEventArgs e)
+    {
+        _handheldShowActions = false;
+        ApplyHandheldPanes();
+    }
+
+    private void ShowHandheldActions()
+    {
+        if (!_isHandheld || _win64Path is null)
+            return;
+
+        _handheldShowActions = true;
+        RefreshSelectedGameTitle();
+        ApplyHandheldPanes();
+    }
+
+    private void RefreshSelectedGameTitle()
+    {
+        if (SelectedGameTitle is null)
+            return;
+
+        var game = _win64Path is null
+            ? null
+            : _allGames.FirstOrDefault(g =>
+                string.Equals(g.Win64Path, _win64Path, StringComparison.OrdinalIgnoreCase));
+        SelectedGameTitle.Text = game?.Name ?? "Selected game";
+
+        var hasIcon = game?.Icon is not null;
+        SelectedGameIcon.Source = game?.Icon;
+        SelectedGameIconBorder.IsVisible = hasIcon;
+        SelectedGameInitialBorder.IsVisible = !hasIcon;
+        SelectedGameInitial.Text = game?.Initial ?? "?";
     }
 
     private async void OnWindowOpened(object? sender, EventArgs e)
@@ -88,6 +237,21 @@ public partial class MainWindow : Window
         {
             _applyingSelection = false;
         }
+    }
+
+    private void OnGamesListTapped(object? sender, TappedEventArgs e)
+    {
+        if (!_isHandheld || _busy || _applyingSelection)
+            return;
+
+        if (e.Source is not Visual visual
+            || visual.FindAncestorOfType<ListBoxItem>(includeSelf: true) is null)
+        {
+            return;
+        }
+
+        if (GamesListBox.SelectedItem is DetectedGame)
+            ShowHandheldActions();
     }
 
     private async void OnAddGameManuallyClick(object? sender, RoutedEventArgs e)
@@ -150,10 +314,12 @@ public partial class MainWindow : Window
             if (_win64Path is not null)
             {
                 _win64Path = null;
+                _handheldShowActions = false;
                 SyncListSelection();
                 RefreshInstalledMods();
                 UpdateActionButtons();
                 SetStatus("Ready");
+                ApplyHandheldPanes();
             }
 
             return;
@@ -163,6 +329,7 @@ public partial class MainWindow : Window
         {
             RefreshInstalledMods();
             ShowInstallStatus();
+            ShowHandheldActions();
             return;
         }
 
@@ -170,10 +337,12 @@ public partial class MainWindow : Window
         if (win64 is null)
         {
             _win64Path = null;
+            _handheldShowActions = false;
             SyncListSelection();
             RefreshInstalledMods();
             UpdateActionButtons();
             SetStatus("No Binaries/Win64 folder was found. Select the game's Steam folder (Manage → Browse local files).");
+            ApplyHandheldPanes();
             return;
         }
 
@@ -184,6 +353,7 @@ public partial class MainWindow : Window
         RefreshInstalledMods();
         UpdateActionButtons();
         ShowInstallStatus();
+        ShowHandheldActions();
     }
 
     private void EnsureGameInList(string pickedPath, string win64Path)
@@ -579,10 +749,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        InstalledModsPanel.IsVisible = true;
         var mods = ModTracker.List(_win64Path).ToList();
         InstalledModsCombo.ItemsSource = mods;
         InstalledModsCombo.SelectedIndex = mods.Count > 0 ? 0 : -1;
+        ApplyInstalledModsVisibility();
     }
 
     private void ShowInstallStatus()
