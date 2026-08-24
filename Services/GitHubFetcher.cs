@@ -10,16 +10,48 @@ public enum Ue4ssChannel
     ZDev
 }
 
+public enum Ue4ssAssetStyle
+{
+    Official,
+    Palworld
+}
+
 /// <summary>
-/// Downloads UE4SS from GitHub. Newest zip comes from <c>experimental-latest</c>.
+/// GitHub release to pull a UE4SS zip from. Palworld uses a rolling community tag
+/// that the Palworld docs keep pointing at; fetching that tag is how this app
+/// stays current without scraping the wiki.
+/// </summary>
+public sealed record Ue4ssReleaseSource(
+    string Owner,
+    string Repo,
+    string Tag,
+    Ue4ssAssetStyle AssetStyle = Ue4ssAssetStyle.Official,
+    string? ArchiveTag = null)
+{
+    public static Ue4ssReleaseSource OfficialExperimental { get; } = new(
+        "UE4SS-RE",
+        "RE-UE4SS",
+        "experimental-latest",
+        Ue4ssAssetStyle.Official,
+        "experimental");
+
+    public static Ue4ssReleaseSource Palworld { get; } = new(
+        "Okaetsu",
+        "RE-UE4SS",
+        "experimental-palworld",
+        Ue4ssAssetStyle.Palworld);
+
+    public string Label => $"{Owner}/{Repo} {Tag}";
+}
+
+/// <summary>
+/// Downloads UE4SS from GitHub. Default source is <c>experimental-latest</c>.
 /// That tag only keeps the current build. A Git SHA pin falls back to the
 /// <c>experimental</c> archive, which still has older zips such as <c>d7e7826d</c>.
+/// Palworld uses <see cref="Ue4ssReleaseSource.Palworld"/> instead.
 /// </summary>
 public static class GitHubFetcher
 {
-    private const string ExperimentalLatestUrl = "https://api.github.com/repos/UE4SS-RE/RE-UE4SS/releases/tags/experimental-latest";
-    private const string ExperimentalArchiveUrl = "https://api.github.com/repos/UE4SS-RE/RE-UE4SS/releases/tags/experimental";
-
     private static readonly Regex SafeRepoPart = new(
         @"^[A-Za-z0-9_.-]+$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -34,23 +66,27 @@ public static class GitHubFetcher
     public static async Task<string> DownloadAsync(
         Ue4ssChannel channel,
         string? pinnedGitSha = null,
+        Ue4ssReleaseSource? source = null,
         CancellationToken cancellationToken = default)
     {
-        var release = await GetReleaseAsync(ExperimentalLatestUrl, cancellationToken);
-        var asset = SelectAsset(release.Assets, channel, pinnedGitSha);
+        source ??= Ue4ssReleaseSource.OfficialExperimental;
+        var release = await GetReleaseAsync(ReleaseTagUrl(source.Owner, source.Repo, source.Tag), cancellationToken);
+        var asset = SelectAsset(release.Assets, channel, pinnedGitSha, source.AssetStyle);
 
-        if (asset is null && pinnedGitSha is not null)
+        if (asset is null && pinnedGitSha is not null && !string.IsNullOrWhiteSpace(source.ArchiveTag))
         {
-            release = await GetReleaseAsync(ExperimentalArchiveUrl, cancellationToken);
-            asset = SelectAsset(release.Assets, channel, pinnedGitSha);
+            release = await GetReleaseAsync(
+                ReleaseTagUrl(source.Owner, source.Repo, source.ArchiveTag),
+                cancellationToken);
+            asset = SelectAsset(release.Assets, channel, pinnedGitSha, source.AssetStyle);
         }
 
         if (asset is null)
         {
             var pin = NormalizeGitSha(pinnedGitSha);
             throw new InvalidOperationException(pin is null
-                ? $"No matching {channel} zip was found on experimental-latest."
-                : $"Pinned UE4SS {pin} was not found on experimental-latest or experimental for {channel}.");
+                ? $"No matching {channel} zip was found on {source.Label}."
+                : $"Pinned UE4SS {pin} was not found on {source.Label} or {source.ArchiveTag} for {channel}.");
         }
 
         return await DownloadAssetAsync(asset, cancellationToken);
@@ -139,14 +175,23 @@ public static class GitHubFetcher
         throw new IOException("Download didn't finish. Try again.");
     }
 
+    internal static string ReleaseTagUrl(string owner, string repo, string tag)
+    {
+        if (!SafeRepoPart.IsMatch(owner) || !SafeRepoPart.IsMatch(repo) || !SafeRepoPart.IsMatch(tag))
+            throw new InvalidOperationException("Invalid GitHub repository.");
+
+        return $"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag}";
+    }
+
     internal static GitHubAsset? SelectAsset(
         IReadOnlyList<GitHubAsset> assets,
         Ue4ssChannel channel,
-        string? pinnedGitSha = null)
+        string? pinnedGitSha = null,
+        Ue4ssAssetStyle style = Ue4ssAssetStyle.Official)
     {
         IEnumerable<GitHubAsset> matches = channel == Ue4ssChannel.ZDev
-            ? assets.Where(a => IsZDevZip(a.Name))
-            : assets.Where(a => IsReleaseZip(a.Name));
+            ? assets.Where(a => IsZDevZip(a.Name, style))
+            : assets.Where(a => IsReleaseZip(a.Name, style));
 
         var pin = NormalizeGitSha(pinnedGitSha);
         if (pin is not null)
@@ -175,15 +220,34 @@ public static class GitHubFetcher
     }
 
     // e.g. UE4SS_v3.0.1-1028-gd7e7826d.zip — never zDEV- or helper zips.
-    private static bool IsReleaseZip(string name)
-        => name.StartsWith("UE4SS_v", StringComparison.OrdinalIgnoreCase)
-           && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
-           && !name.StartsWith("zDEV-", StringComparison.OrdinalIgnoreCase);
+    // Palworld: UE4SS-Palworld.zip
+    internal static bool IsReleaseZip(string name, Ue4ssAssetStyle style = Ue4ssAssetStyle.Official)
+        => style == Ue4ssAssetStyle.Palworld
+            ? IsPalworldNamedZip(name, zDev: false)
+            : name.StartsWith("UE4SS_v", StringComparison.OrdinalIgnoreCase)
+              && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+              && !name.StartsWith("zDEV-", StringComparison.OrdinalIgnoreCase);
 
     // e.g. zDEV-UE4SS_v3.0.1-1028-gd7e7826d.zip
-    private static bool IsZDevZip(string name)
-        => name.StartsWith("zDEV-UE4SS_", StringComparison.OrdinalIgnoreCase)
-           && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+    // Palworld: UE4SS-Palworld_zDev.zip
+    internal static bool IsZDevZip(string name, Ue4ssAssetStyle style = Ue4ssAssetStyle.Official)
+        => style == Ue4ssAssetStyle.Palworld
+            ? IsPalworldNamedZip(name, zDev: true)
+            : name.StartsWith("zDEV-UE4SS_", StringComparison.OrdinalIgnoreCase)
+              && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsPalworldNamedZip(string name, bool zDev)
+    {
+        var file = Path.GetFileName(name);
+        if (!file.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+            || !file.StartsWith("UE4SS-Palworld", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var isZDev = file.Contains("zdev", StringComparison.OrdinalIgnoreCase);
+        return zDev == isZDev;
+    }
 
     private static HttpClient CreateClient()
     {

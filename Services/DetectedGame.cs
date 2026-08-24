@@ -28,5 +28,6 @@ public sealed class DetectedGame
 
     public bool HasIcon => Icon is not null;
     public bool HasChannelLabel => !string.IsNullOrEmpty(ChannelLabel);
-    public bool HasKnownSignatures => KnownSignatureCatalog.Find(this) is not null;
+    public string? SupportBadge => KnownSignatureCatalog.Find(this)?.SupportBadge;
+    public bool HasSupportBadge => !string.IsNullOrEmpty(SupportBadge);
 }

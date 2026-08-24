@@ -29,6 +29,8 @@ This build on VirusTotal: [scan](https://www.virustotal.com/gui/file/86d7157073b
 
 Mortal Shell II is pinned to Git SHA `d7e7826d` (build 1028). Later experimental zips break tarstone Lua on that game. `experimental-latest` only keeps the newest build, so that pin is downloaded from the `experimental` archive tag. Witchfire, Wuchang, and unknown titles still get the newest zip.
 
+**Palworld** does not use `experimental-latest`. The [Palworld modding docs](https://pwmodding.wiki/docs/users/ue4ss/downloading) recommend `UE4SS-Palworld.zip` from [Okaetsu/RE-UE4SS `experimental-palworld`](https://github.com/Okaetsu/RE-UE4SS/releases/tag/experimental-palworld). That tag is rolling and kept in sync with Steam Workshop, so **Install UE4SS** fetches it on every Palworld install. Disable Workshop UE4SS first — two copies crash the game. Palworld does not get signature packs.
+
 After one install with this app, switching channels cleans files this installer previously extracted. Manual UE4SS copies are not tracked, so leftovers can remain until you install once through the app.
 
 Same-channel updates keep `UE4SS-settings.ini`. Switching Release ↔ zDev overwrites it. Mods you added that are not in the UE4SS zip are left alone.
@@ -100,4 +102,4 @@ Windows releases are meant to be signed through [SignPath.io](https://signpath.i
 
 ## Credits
 
-UE4SS is [UE4SS-RE/RE-UE4SS](https://github.com/UE4SS-RE/RE-UE4SS). This app only downloads the `experimental-latest` zips and copies them into the game folder you choose.
+UE4SS is [UE4SS-RE/RE-UE4SS](https://github.com/UE4SS-RE/RE-UE4SS). This app downloads `experimental-latest` for most games, and the Palworld community zip from [Okaetsu/RE-UE4SS](https://github.com/Okaetsu/RE-UE4SS) when Palworld is selected.

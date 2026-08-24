@@ -118,8 +118,8 @@
                                                         Orientation="Horizontal"
                                                         Spacing="8"
                                                         VerticalAlignment="Center">
-                                                <TextBlock Text="Signatures"
-                                                           IsVisible="{Binding HasKnownSignatures}"
+                                                <TextBlock Text="{Binding SupportBadge}"
+                                                           IsVisible="{Binding HasSupportBadge}"
                                                            FontSize="12"
                                                            Foreground="{StaticResource AppFaint}" />
                                                 <TextBlock Text="{Binding ChannelLabel}"

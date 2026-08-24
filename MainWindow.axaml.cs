@@ -405,7 +405,7 @@ public partial class MainWindow : Window
         await RunBusyAsync("Downloading...", async () =>
         {
             var pack = FindSignaturePack(win64Path);
-            var zipPath = await GitHubFetcher.DownloadAsync(channel, pack?.PinnedUe4ssGitSha);
+            var zipPath = await GitHubFetcher.DownloadAsync(channel, pack?.PinnedUe4ssGitSha, pack?.Ue4ssSource);
             try
             {
                 SetStatus("Extracting...");
@@ -421,6 +421,14 @@ public partial class MainWindow : Window
             if (pack is null)
             {
                 SetStatus($"Installed {FormatChannel(channel)}. {InstallTracker.Detect(win64Path).StatusText}");
+                return;
+            }
+
+            if (!pack.HasSignaturePack)
+            {
+                var source = pack.Ue4ssSource?.Tag ?? pack.DisplayName;
+                var hint = string.IsNullOrWhiteSpace(pack.InstallHint) ? "" : $" {pack.InstallHint}";
+                SetStatus($"Installed {FormatChannel(channel)} from {source}.{hint}");
                 return;
             }
 
@@ -769,7 +777,12 @@ public partial class MainWindow : Window
         SetStatus(InstallTracker.Detect(_win64Path).StatusText);
         var pack = FindSignaturePack(_win64Path);
         if (pack is not null)
-            SetStatus($"{StatusText.Text} {pack.DisplayName} will be applied on install.");
+        {
+            var note = string.IsNullOrWhiteSpace(pack.InstallHint)
+                ? $"{pack.DisplayName} will be applied on install."
+                : pack.InstallHint;
+            SetStatus($"{StatusText.Text} {note}");
+        }
     }
 
     private KnownSignaturePack? FindSignaturePack(string win64Path)
