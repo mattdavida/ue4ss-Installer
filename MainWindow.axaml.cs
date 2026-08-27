@@ -58,12 +58,6 @@ public partial class MainWindow : Window
         _isHandheld = decision.IsHandheld;
         Classes.Set("handheld", _isHandheld);
 
-        if (LayoutBadge is not null)
-        {
-            LayoutBadge.IsVisible = _isHandheld;
-            LayoutBadge.Text = $"Handheld layout · {decision.Reason}";
-        }
-
         if (GamesHint is not null)
         {
             GamesHint.Text = _isHandheld
@@ -510,14 +504,12 @@ public partial class MainWindow : Window
 
         if (zipPath is not null)
         {
-            await RunBusyAsync("Installing...", async () =>
+            var reinstall = ZipInstaller.WouldReinstall(zipPath, win64Path);
+            await RunBusyAsync(reinstall ? "Reinstalling..." : "Installing...", async () =>
             {
                 var result = await Task.Run(() => ZipInstaller.InstallMod(zipPath, win64Path));
                 RefreshInstalledMods();
-                var where = result.Kind == ModPackageKind.GameDirectory
-                    ? "the game folder (UE4SS pack / overlay)"
-                    : "the Mods folder";
-                SetStatus($"Installed {result.Name} into {where}.");
+                SetStatus(ZipInstaller.FormatModInstallStatus(result));
             });
             return;
         }
@@ -567,29 +559,52 @@ public partial class MainWindow : Window
 
         _pendingModUninstall = null;
         _pendingModZip = zipPath;
-        var name = Path.GetFileNameWithoutExtension(zipPath);
-        if (string.IsNullOrWhiteSpace(name))
-            name = "this mod";
-
-        ConfirmTitle.Text = $"Install {name}?";
-        ConfirmBody.Text = DescribeModZip(zipPath, name);
-        ConfirmActionButton.Content = "Install";
-        UninstallConfirmOverlay.IsVisible = true;
-    }
-
-    private static string DescribeModZip(string zipPath, string name)
-    {
+        string name;
+        var reinstall = false;
+        ModPackageKind? kind = null;
         try
         {
-            var kind = ZipInstaller.PeekModZipKind(zipPath);
-            return kind == ModPackageKind.GameDirectory
-                ? $"This installs {name} into the game folder. You can uninstall it later from Installed mods."
-                : $"This installs {name} into the Mods folder. You can uninstall it later from Installed mods.";
+            var preview = ZipInstaller.PreviewModInstall(zipPath, _win64Path);
+            name = preview.Name;
+            reinstall = preview.WouldReinstall;
+            kind = preview.Kind;
         }
         catch
         {
-            return $"This installs {name} into the selected game. You can uninstall it later from Installed mods.";
+            name = ZipInstaller.CleanZipStem(zipPath);
         }
+
+        ConfirmTitle.Text = reinstall ? $"Reinstall {name}?" : $"Install {name}?";
+        ConfirmBody.Text = DescribeModZip(zipPath, name, reinstall, kind);
+        ConfirmActionButton.Content = reinstall ? "Reinstall" : "Install";
+        UninstallConfirmOverlay.IsVisible = true;
+    }
+
+    internal static string DescribeModZip(string zipPath, string name, bool reinstall, ModPackageKind? kind = null)
+    {
+        if (kind is null)
+        {
+            try
+            {
+                kind = ZipInstaller.PeekModZipKind(zipPath);
+            }
+            catch
+            {
+                // Fall through with a generic destination.
+            }
+        }
+
+        var target = kind switch
+        {
+            ModPackageKind.GameDirectory => "the game folder",
+            ModPackageKind.ModsFolder => "the Mods folder",
+            _ => "the selected game"
+        };
+
+        if (reinstall)
+            return $"This replaces the existing {name} install. Old files are removed first, then the new zip is copied into {target}.";
+
+        return $"This installs {name} into {target}. You can uninstall it later from Installed mods.";
     }
 
     private void OnUninstallModClick(object? sender, RoutedEventArgs e)

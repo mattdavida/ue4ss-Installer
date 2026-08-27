@@ -34,6 +34,10 @@ public static class ModTracker
     public static IReadOnlyList<InstalledMod> List(string win64Path)
         => Load(win64Path).Mods;
 
+    public static InstalledMod? FindByName(string win64Path, string name)
+        => Load(win64Path).Mods.FirstOrDefault(m =>
+            string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase));
+
     public static void SaveMod(string win64Path, InstalledMod mod)
     {
         var manifest = Load(win64Path);
