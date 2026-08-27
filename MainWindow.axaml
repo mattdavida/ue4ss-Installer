@@ -51,12 +51,6 @@
                   RowSpacing="10">
                 <StackPanel x:Name="GamesHeader"
                             Spacing="8">
-                    <TextBlock x:Name="LayoutBadge"
-                               Text="Handheld layout"
-                               FontSize="12"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource AppAccent}"
-                               IsVisible="False" />
                     <TextBlock x:Name="GamesHint"
                                Text="Click a game below. If it isn't listed, add it manually."
                                Foreground="{StaticResource AppMuted}"
