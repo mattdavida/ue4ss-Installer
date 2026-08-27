@@ -227,7 +227,8 @@ public static class ZipInstaller
             if (parts.Length < 2)
                 break;
 
-            if (!IsDisposableZipToken(parts[^1]))
+            if (!IsDisposableZipToken(parts[^1])
+                && !IsArchiveIdAfterTimestamp(parts))
                 break;
 
             strippedMetadata = true;
@@ -398,6 +399,24 @@ public static class ZipInstaller
            || DottedVersionToken.IsMatch(token)
            || LooksLikeNexusHash(token);
 
+    private static bool IsArchiveIdAfterTimestamp(string[] parts)
+    {
+        if (parts.Length < 2 || !TimestampToken.IsMatch(parts[^2]))
+            return false;
+
+        var token = parts[^1];
+        if (token.Length is < 8 or > 12)
+            return false;
+
+        foreach (var c in token)
+        {
+            if (!char.IsAsciiLetterOrDigit(c))
+                return false;
+        }
+
+        return token.Any(char.IsAsciiLetter);
+    }
+
     private static bool LooksLikeNexusHash(string token)
     {
         if (token.Length is < 8 or > 12)
@@ -415,7 +434,41 @@ public static class ZipInstaller
                 return false;
         }
 
-        return hasLetter && hasDigit;
+        if (!hasLetter)
+            return false;
+        if (hasDigit)
+            return true;
+
+        return HasIrregularCasing(token);
+    }
+
+    private static bool HasIrregularCasing(string token)
+    {
+        var upper = 0;
+        var lower = 0;
+        foreach (var c in token)
+        {
+            if (char.IsUpper(c))
+                upper++;
+            else if (char.IsLower(c))
+                lower++;
+        }
+
+        if (upper == 0 || lower == 0)
+            return false;
+        if (upper == 1 && char.IsUpper(token[0]))
+            return false;
+
+        if (!char.IsUpper(token[0]))
+            return true;
+
+        for (var i = 1; i < token.Length; i++)
+        {
+            if (char.IsUpper(token[i]) && char.IsUpper(token[i - 1]))
+                return true;
+        }
+
+        return false;
     }
 
     private static List<string> ListMappedFiles(ZipArchive archive, string? stripPrefix)

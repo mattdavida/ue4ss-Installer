@@ -304,6 +304,8 @@ public sealed class ModInstallTests
     [InlineData("MortalShell2Mod.zip", "MortalShell2Mod")]
     [InlineData("CoolMod (1).zip", "CoolMod")]
     [InlineData("MortalShell2Mod 20 6.6 2026-08-24T22-49Z Hdppafbn8 (1).zip", "MortalShell2Mod")]
+    [InlineData("MortalShell2Mod 20 6.7 2026-08-27T10-57Z UHuuZiksP.zip", "MortalShell2Mod")]
+    [InlineData("CoolMod MortalShell.zip", "CoolMod MortalShell")]
     [InlineData("Half Life 2.zip", "Half Life 2")]
     public void CleanZipStem_strips_nexus_download_noise_but_keeps_real_names(string fileName, string expected)
     {
