@@ -27,6 +27,24 @@ public sealed class KnownSignatureCatalogTests
     }
 
     [Fact]
+    public void Matches_Fatal_Claw_by_app_id_and_sets_engine_override()
+    {
+        var pack = KnownSignatureCatalog.Find("2827750", "Something Else", null, null);
+        Assert.Equal("FatalClaw-UE4SS-Fix", pack?.Repo);
+        Assert.True(pack?.HasEngineVersionOverride);
+        Assert.False(pack?.HasPinnedUe4ss);
+        Assert.Equal(4, pack?.EngineMajorVersion);
+        Assert.Equal(27, pack?.EngineMinorVersion);
+    }
+
+    [Fact]
+    public void Matches_Fatal_Claw_by_folder_name()
+    {
+        var pack = KnownSignatureCatalog.Find(null, null, @"D:\SteamLibrary\steamapps\common\Fatal Claw", null);
+        Assert.Equal("FatalClaw-UE4SS-Fix", pack?.Repo);
+    }
+
+    [Fact]
     public void Matches_Wuchang_by_app_id_and_includes_hook_patches()
     {
         var pack = KnownSignatureCatalog.Find("2277560", "Something Else", null, null);

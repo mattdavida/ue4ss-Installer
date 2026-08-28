@@ -71,6 +71,17 @@ public static class KnownSignatureCatalog
         },
         new KnownSignaturePack
         {
+            DisplayName = "Fatal Claw signatures",
+            Owner = "mattdavida",
+            Repo = "FatalClaw-UE4SS-Fix",
+            SteamAppIds = ["2827750"],
+            NameContains = ["Fatal Claw"],
+            FolderNames = ["FatalClaw", "Fatal Claw"],
+            EngineMajorVersion = 4,
+            EngineMinorVersion = 27
+        },
+        new KnownSignaturePack
+        {
             DisplayName = "Wuchang: Fallen Feathers signatures",
             Owner = "mattdavida",
             Repo = "Wuchang-UE4SS-Fix",

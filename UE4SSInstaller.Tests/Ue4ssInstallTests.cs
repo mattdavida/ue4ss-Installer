@@ -90,6 +90,35 @@ public sealed class Ue4ssInstallTests
     }
 
     [Fact]
+    public void Uninstall_ue4ss_clears_installed_mods_state_so_the_combo_has_no_selection()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        var ue4ss = TestZip.Create(temp.Path,
+            ("dwmapi.dll", "proxy"),
+            ("ue4ss/UE4SS.dll", "core"));
+        ZipInstaller.InstallUe4ss(ue4ss, win64, Ue4ssChannel.Release);
+
+        var modZip = TestZip.CreateNamed(temp.Combine("zips"), "CoolMod.zip",
+            ("CoolMod/Scripts/main.lua", "hi"));
+        ZipInstaller.InstallMod(modZip, win64);
+
+        var before = MainWindow.GetInstalledModsState(win64);
+        Assert.Equal("CoolMod", Assert.Single(before.Mods).Name);
+        Assert.NotNull(before.Selected);
+        Assert.Equal("CoolMod", before.Selected!.Name);
+
+        var staleId = before.Selected.Id;
+        ZipInstaller.UninstallUe4ss(win64);
+
+        var after = MainWindow.GetInstalledModsState(win64, staleId);
+        Assert.Empty(after.Mods);
+        Assert.Null(after.Selected);
+    }
+
+    [Fact]
     public void Does_not_extract_zip_entries_outside_win64()
     {
         using var temp = new TempDir();

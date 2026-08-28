@@ -27,7 +27,7 @@ This build on VirusTotal: [scan](https://www.virustotal.com/gui/file/86d7157073b
 
 **Release** is the newest `UE4SS_v*.zip` on the `experimental-latest` tag. **zDev** is the newest `zDEV-UE4SS_v*.zip` from that same tag. GitHub’s `/releases/latest` is not used; that channel is currently frozen.
 
-Mortal Shell II is pinned to Git SHA `d7e7826d` (build 1028). Later experimental zips break tarstone Lua on that game. `experimental-latest` only keeps the newest build, so that pin is downloaded from the `experimental` archive tag. Witchfire, Wuchang, and unknown titles still get the newest zip.
+Mortal Shell II is pinned to Git SHA `d7e7826d` (build 1028). Later experimental zips break tarstone Lua on that game. `experimental-latest` only keeps the newest build, so that pin is downloaded from the `experimental` archive tag. Witchfire, Fatal Claw, Wuchang, and unknown titles still get the newest zip.
 
 **Palworld** does not use `experimental-latest`. The [Palworld modding docs](https://pwmodding.wiki/docs/users/ue4ss/downloading) recommend `UE4SS-Palworld.zip` from [Okaetsu/RE-UE4SS `experimental-palworld`](https://github.com/Okaetsu/RE-UE4SS/releases/tag/experimental-palworld). That tag is rolling and kept in sync with Steam Workshop, so **Install UE4SS** fetches it on every Palworld install. Disable Workshop UE4SS first — two copies crash the game. Palworld does not get signature packs.
 
@@ -45,6 +45,7 @@ Currently included:
 
 - [Mortal Shell II](https://github.com/mattdavida/MortalShell2-UE4SS-Fix) (`StaticConstructObject.lua`)
 - [Witchfire](https://github.com/mattdavida/Witchfire-ue4ss-fix) (`ConsoleManager.lua`, plus `EngineVersionOverride` 4.27 in `UE4SS-settings.ini`)
+- [Fatal Claw](https://github.com/mattdavida/FatalClaw-UE4SS-Fix) (`ConsoleManager.lua`, plus `EngineVersionOverride` 4.27 in `UE4SS-settings.ini`)
 - [Wuchang: Fallen Feathers](https://github.com/mattdavida/Wuchang-UE4SS-Fix) (`ConsoleManager.lua`, plus `HookInitGameState = 0` in `UE4SS-settings.ini`)
 
 Signature files are not added to the UE4SS manifest, so a later channel switch will not delete them. They are overwritten on the next install.
@@ -53,10 +54,10 @@ Signature files are not added to the UE4SS manifest, so a later channel switch w
 
 **Install Mod Zip** looks at the archive (and one wrapper folder, if present):
 
-- Full pack (`dwmapi.dll` + `ue4ss/`) or a `ue4ss/` overlay → extracted into `Binaries/Win64`
-- Anything else → extracted into `ue4ss/Mods` (a leading `Mods/` folder is stripped)
+- Full pack (`dwmapi.dll` + `ue4ss/`) or a `ue4ss/` overlay → extracted into `Binaries/Win64` even if UE4SS is not installed yet
+- Anything else → extracted into `ue4ss/Mods` (a leading `Mods/` folder is stripped). This needs UE4SS already in place; otherwise the status line says **UE4SS is not installed.**
 
-Mod files installed with this app are listed under **Installed mods** and can be removed with **Uninstall Mod**. Files that belong to UE4SS itself are left alone. Manual copies into `Mods` are not listed (a later folder scan can reconcile those).
+Mod files installed with this app are listed under **Installed mods**. **Edit** changes the list name or adds a short note; files on disk are not renamed. **Uninstall Mod** removes that zip's files. Files that belong to UE4SS itself are left alone. Manual copies into `Mods` are not listed (a later folder scan can reconcile those).
 
 ## Steam Deck / Linux
 

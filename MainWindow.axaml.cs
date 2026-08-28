@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private bool _busy;
     private bool _applyingSelection;
     private InstalledMod? _pendingModUninstall;
+    private InstalledMod? _pendingEditMod;
     private string? _pendingModZip;
     private bool _isHandheld;
     private bool _handheldShowActions;
@@ -68,6 +69,7 @@ public partial class MainWindow : Window
         ApplyHandheldPanes();
         ApplyChromeInset(WindowDecorationMargin);
         ApplyConfirmLayout();
+        ApplyEditModLayout();
     }
 
     private void ApplyHandheldPanes()
@@ -146,6 +148,39 @@ public partial class MainWindow : Window
             ConfirmButtons.Orientation = Avalonia.Layout.Orientation.Horizontal;
             ConfirmButtons.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
             foreach (var child in ConfirmButtons.Children)
+            {
+                if (child is Control control)
+                    control.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
+            }
+        }
+    }
+
+    private void ApplyEditModLayout()
+    {
+        if (EditModCard is null || EditModButtons is null)
+            return;
+
+        if (_isHandheld)
+        {
+            EditModCard.Width = double.NaN;
+            EditModCard.Margin = new Thickness(16);
+            EditModCard.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            EditModButtons.Orientation = Avalonia.Layout.Orientation.Vertical;
+            EditModButtons.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            foreach (var child in EditModButtons.Children)
+            {
+                if (child is Control control)
+                    control.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch;
+            }
+        }
+        else
+        {
+            EditModCard.Width = 380;
+            EditModCard.Margin = new Thickness(0);
+            EditModCard.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center;
+            EditModButtons.Orientation = Avalonia.Layout.Orientation.Horizontal;
+            EditModButtons.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
+            foreach (var child in EditModButtons.Children)
             {
                 if (child is Control control)
                     control.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right;
@@ -391,6 +426,7 @@ public partial class MainWindow : Window
         if (_win64Path is null || _busy)
             return;
 
+        HideEditModOverlay();
         var win64Path = _win64Path;
         var channel = VersionComboBox.SelectedIndex == 1
             ? Ue4ssChannel.ZDev
@@ -476,6 +512,7 @@ public partial class MainWindow : Window
 
         _pendingModUninstall = null;
         _pendingModZip = null;
+        HideEditModOverlay();
         ConfirmTitle.Text = "Uninstall UE4SS?";
         ConfirmBody.Text =
             "This deletes the ue4ss folder (including mods and signatures) and UE4SS DLLs in Win64 such as dwmapi.dll.";
@@ -516,7 +553,7 @@ public partial class MainWindow : Window
 
         if (mod is not null)
         {
-            var name = mod.Name;
+            var name = mod.DisplayName;
             await RunBusyAsync($"Removing {name}...", async () =>
             {
                 await Task.Run(() => ZipInstaller.UninstallMod(win64Path, mod.Id));
@@ -558,7 +595,8 @@ public partial class MainWindow : Window
         }
 
         _pendingModUninstall = null;
-        _pendingModZip = zipPath;
+        _pendingModZip = null;
+        HideEditModOverlay();
         string name;
         var reinstall = false;
         ModPackageKind? kind = null;
@@ -569,10 +607,17 @@ public partial class MainWindow : Window
             reinstall = preview.WouldReinstall;
             kind = preview.Kind;
         }
+        catch (InvalidOperationException ex) when (ex.Message == ZipInstaller.Ue4ssNotInstalledMessage)
+        {
+            SetStatus(ZipInstaller.Ue4ssNotInstalledMessage);
+            return;
+        }
         catch
         {
             name = ZipInstaller.CleanZipStem(zipPath);
         }
+
+        _pendingModZip = zipPath;
 
         ConfirmTitle.Text = reinstall ? $"Reinstall {name}?" : $"Install {name}?";
         ConfirmBody.Text = DescribeModZip(zipPath, name, reinstall, kind);
@@ -617,7 +662,8 @@ public partial class MainWindow : Window
 
         _pendingModZip = null;
         _pendingModUninstall = mod;
-        ConfirmTitle.Text = $"Remove {mod.Name}?";
+        HideEditModOverlay();
+        ConfirmTitle.Text = $"Remove {mod.DisplayName}?";
         ConfirmBody.Text =
             "This deletes the files this app installed for that mod. UE4SS itself is left alone.";
         ConfirmActionButton.Content = "Uninstall";
@@ -759,26 +805,120 @@ public partial class MainWindow : Window
         GamesListBox.IsEnabled = !_busy;
         SearchTextBox.IsEnabled = !_busy;
         PathTextBox.IsEnabled = !_busy;
-        UninstallModButton.IsEnabled = canAct
-                                       && InstalledModsCombo.SelectedItem is InstalledMod;
+        var hasSelectedMod = InstalledModsCombo.SelectedItem is InstalledMod;
+        UninstallModButton.IsEnabled = canAct && hasSelectedMod;
+        EditModButton.IsEnabled = canAct && hasSelectedMod;
         InstalledModsCombo.IsEnabled = !_busy;
     }
 
-    private void RefreshInstalledMods()
+    private void OnEditModClick(object? sender, RoutedEventArgs e)
     {
+        if (_win64Path is null || _busy)
+            return;
+
+        if (InstalledModsCombo.SelectedItem is not InstalledMod mod)
+            return;
+
+        _pendingEditMod = mod;
+        UninstallConfirmOverlay.IsVisible = false;
+        EditModNameBox.Text = mod.DisplayName;
+        EditModNameBox.PlaceholderText = mod.Name;
+        EditModNoteBox.Text = mod.Note ?? "";
+        EditModOverlay.IsVisible = true;
+    }
+
+    private void OnEditModCancelClick(object? sender, RoutedEventArgs e)
+        => HideEditModOverlay();
+
+    private void OnEditModSaveClick(object? sender, RoutedEventArgs e)
+    {
+        if (_win64Path is null || _pendingEditMod is null)
+        {
+            HideEditModOverlay();
+            return;
+        }
+
+        var id = _pendingEditMod.Id;
+        var label = EditModNameBox.Text;
+        var note = EditModNoteBox.Text;
+        HideEditModOverlay();
+
+        if (!ModTracker.UpdateDisplay(_win64Path, id, label, note))
+        {
+            SetStatus("Could not update that mod. It may have been uninstalled.");
+            RefreshInstalledMods();
+            return;
+        }
+
+        RefreshInstalledMods(id);
+        var updated = ModTracker.List(_win64Path).FirstOrDefault(m => m.Id == id);
+        SetStatus(updated is null
+            ? "Updated the installed mod list."
+            : $"Updated {updated.DisplayName}.");
+    }
+
+    private void HideEditModOverlay()
+    {
+        if (EditModOverlay is not null)
+            EditModOverlay.IsVisible = false;
+        _pendingEditMod = null;
+    }
+
+    internal readonly record struct InstalledModsState(
+        IReadOnlyList<InstalledMod> Mods,
+        InstalledMod? Selected);
+
+    /// <summary>
+    /// List and selection for the Installed mods combo. After UE4SS uninstall the
+    /// tracker is empty, so Selected is null and the combo must not keep a stale item.
+    /// </summary>
+    internal static InstalledModsState GetInstalledModsState(string? win64Path, string? selectId = null)
+    {
+        if (string.IsNullOrWhiteSpace(win64Path))
+            return new InstalledModsState([], null);
+
+        var mods = ModTracker.List(win64Path);
+        if (mods.Count == 0)
+            return new InstalledModsState(mods, null);
+
+        if (!string.IsNullOrWhiteSpace(selectId))
+        {
+            var match = mods.FirstOrDefault(m => m.Id == selectId);
+            if (match is not null)
+                return new InstalledModsState(mods, match);
+        }
+
+        return new InstalledModsState(mods, mods[0]);
+    }
+
+    private void RefreshInstalledMods(string? selectId = null)
+    {
+        if (selectId is null)
+            HideEditModOverlay();
+
         InstalledModsCombo.SelectedItem = null;
+        InstalledModsCombo.SelectedIndex = -1;
         InstalledModsCombo.ItemsSource = null;
 
         if (_win64Path is null)
         {
             InstalledModsPanel.IsVisible = false;
+            UpdateActionButtons();
             return;
         }
 
-        var mods = ModTracker.List(_win64Path).ToList();
-        InstalledModsCombo.ItemsSource = mods;
-        InstalledModsCombo.SelectedIndex = mods.Count > 0 ? 0 : -1;
+        var state = GetInstalledModsState(_win64Path, selectId);
+        if (state.Mods.Count == 0)
+        {
+            ApplyInstalledModsVisibility();
+            UpdateActionButtons();
+            return;
+        }
+
+        InstalledModsCombo.ItemsSource = state.Mods;
+        InstalledModsCombo.SelectedItem = state.Selected;
         ApplyInstalledModsVisibility();
+        UpdateActionButtons();
     }
 
     private void ShowInstallStatus()
