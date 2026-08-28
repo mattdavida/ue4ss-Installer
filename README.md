@@ -54,10 +54,10 @@ Signature files are not added to the UE4SS manifest, so a later channel switch w
 
 **Install Mod Zip** looks at the archive (and one wrapper folder, if present):
 
-- Full pack (`dwmapi.dll` + `ue4ss/`) or a `ue4ss/` overlay → extracted into `Binaries/Win64`
-- Anything else → extracted into `ue4ss/Mods` (a leading `Mods/` folder is stripped)
+- Full pack (`dwmapi.dll` + `ue4ss/`) or a `ue4ss/` overlay → extracted into `Binaries/Win64` even if UE4SS is not installed yet
+- Anything else → extracted into `ue4ss/Mods` (a leading `Mods/` folder is stripped). This needs UE4SS already in place; otherwise the status line says **UE4SS is not installed.**
 
-Mod files installed with this app are listed under **Installed mods** and can be removed with **Uninstall Mod**. Files that belong to UE4SS itself are left alone. Manual copies into `Mods` are not listed (a later folder scan can reconcile those).
+Mod files installed with this app are listed under **Installed mods**. **Edit** changes the list name or adds a short note; files on disk are not renamed. **Uninstall Mod** removes that zip's files. Files that belong to UE4SS itself are left alone. Manual copies into `Mods` are not listed (a later folder scan can reconcile those).
 
 ## Steam Deck / Linux
 

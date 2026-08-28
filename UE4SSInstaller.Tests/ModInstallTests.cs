@@ -1,4 +1,3 @@
-using UE4SSInstaller;
 using UE4SSInstaller.Services;
 
 namespace UE4SSInstaller.Tests;
@@ -234,6 +233,32 @@ public sealed class ModInstallTests
     }
 
     [Fact]
+    public void Reinstall_keeps_a_custom_label_and_note()
+    {
+        using var temp = new TempDir();
+        var win64 = PrepareWin64(temp);
+        var first = NamedModZip(temp, "MortalShell2Mod.zip",
+            ("MortalShell2Mod/Scripts/main.lua", "v1"));
+        var second = NamedModZip(temp, "MortalShell2Mod 20 6.6 2026-08-24T22-49Z Hdppafbn8.zip",
+            ("MortalShell2Mod/Scripts/main.lua", "v2"));
+
+        ZipInstaller.InstallMod(first, win64);
+        var originalId = Assert.Single(ModTracker.List(win64)).Id;
+        Assert.True(ModTracker.UpdateDisplay(win64, originalId, "Cheat menu", "use with zDev"));
+
+        var result = ZipInstaller.InstallMod(second, win64);
+        Assert.True(result.Reinstalled);
+        Assert.Equal("MortalShell2Mod", result.Name);
+
+        var listed = Assert.Single(ModTracker.List(win64));
+        Assert.Equal(originalId, listed.Id);
+        Assert.Equal("MortalShell2Mod", listed.Name);
+        Assert.Equal("Cheat menu", listed.Label);
+        Assert.Equal("use with zDev", listed.Note);
+        Assert.Equal("v2", File.ReadAllText(Path.Combine(win64, "ue4ss", "Mods", "MortalShell2Mod", "Scripts", "main.lua")));
+    }
+
+    [Fact]
     public void Reinstall_collapses_already_tracked_nexus_names_that_share_a_mod_folder()
     {
         using var temp = new TempDir();
@@ -330,6 +355,78 @@ public sealed class ModInstallTests
         Assert.Equal(
             "This replaces the existing SigPack install. Old files are removed first, then the new zip is copied into the game folder.",
             MainWindow.DescribeModZip(overlay, "SigPack", reinstall: true));
+    }
+
+    [Fact]
+    public void Mods_folder_zip_without_ue4ss_is_rejected_and_does_not_copy_files()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+        var zip = NamedModZip(temp, "CoolMod.zip", ("CoolMod/Scripts/main.lua", "hi"));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => ZipInstaller.InstallMod(zip, win64));
+        Assert.Equal(ZipInstaller.Ue4ssNotInstalledMessage, ex.Message);
+        Assert.False(Directory.Exists(Path.Combine(win64, "Mods")));
+        Assert.False(Directory.Exists(Path.Combine(win64, "ue4ss")));
+        Assert.Empty(ModTracker.List(win64));
+    }
+
+    [Fact]
+    public void Preview_of_a_mods_folder_zip_without_ue4ss_says_ue4ss_is_not_installed()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+        var zip = NamedModZip(temp, "CoolMod.zip", ("CoolMod/Scripts/main.lua", "hi"));
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ZipInstaller.PreviewModInstall(zip, win64));
+        Assert.Equal(ZipInstaller.Ue4ssNotInstalledMessage, ex.Message);
+    }
+
+    [Fact]
+    public void Game_directory_pack_still_installs_when_ue4ss_is_missing()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+        var zip = NamedModZip(temp, "UE4SS-pack.zip",
+            ("dwmapi.dll", "proxy"),
+            ("ue4ss/UE4SS.dll", "core"),
+            ("ue4ss/Mods/Included/Scripts/main.lua", "mod"));
+
+        var result = ZipInstaller.InstallMod(zip, win64);
+
+        Assert.Equal(ModPackageKind.GameDirectory, result.Kind);
+        Assert.True(File.Exists(Path.Combine(win64, "dwmapi.dll")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "UE4SS.dll")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "Mods", "Included", "Scripts", "main.lua")));
+        Assert.Equal("Included", Assert.Single(ModTracker.List(win64)).Name);
+    }
+
+    [Fact]
+    public void Uninstall_mod_without_ue4ss_says_ue4ss_is_not_installed()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ZipInstaller.UninstallMod(win64, "missing"));
+        Assert.Equal(ZipInstaller.Ue4ssNotInstalledMessage, ex.Message);
+    }
+
+    [Fact]
+    public void Uninstall_unknown_mod_with_ue4ss_present_keeps_the_list_message()
+    {
+        using var temp = new TempDir();
+        var win64 = PrepareWin64(temp);
+        File.WriteAllText(Path.Combine(win64, "ue4ss", "UE4SS.dll"), "core");
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => ZipInstaller.UninstallMod(win64, "missing"));
+        Assert.Equal("That mod is not in the installer list.", ex.Message);
     }
 
     private static string PrepareWin64(TempDir temp)

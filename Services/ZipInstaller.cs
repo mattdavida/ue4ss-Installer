@@ -5,6 +5,7 @@ namespace UE4SSInstaller.Services;
 
 public static class ZipInstaller
 {
+    public const string Ue4ssNotInstalledMessage = "UE4SS is not installed.";
     private static readonly Regex DuplicateDownloadSuffix = new(
         @"\s*\(\d+\)$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
@@ -140,12 +141,15 @@ public static class ZipInstaller
         var layout = InspectModZip(archive);
         var incoming = RelativesToWin64(win64Path, layout.Kind, ListMappedFiles(archive, layout.StripPrefix));
         var name = InferModName(incoming, zipPath);
+        EnsureUe4ssPresentForModsFolder(win64Path, layout.Kind);
 
         var previous = FindPreviousMods(win64Path, name, incoming);
         var reinstalled = previous.Count > 0;
-        var previousId = previous.FirstOrDefault(m =>
-                             string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))?.Id
-                         ?? previous.FirstOrDefault()?.Id;
+        var previousKeep = previous.FirstOrDefault(m =>
+                               string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
+                           ?? previous.FirstOrDefault(m =>
+                               !string.IsNullOrWhiteSpace(m.Label) || !string.IsNullOrWhiteSpace(m.Note))
+                           ?? previous.FirstOrDefault();
         foreach (var mod in previous)
             UninstallMod(win64Path, mod.Id);
 
@@ -167,11 +171,24 @@ public static class ZipInstaller
             Kind = layout.Kind,
             Files = relativeToWin64
         };
-        if (previousId is not null)
-            record.Id = previousId;
+        if (previousKeep is not null)
+        {
+            record.Id = previousKeep.Id;
+            record.Label = previousKeep.Label;
+            record.Note = previousKeep.Note;
+        }
 
         ModTracker.SaveMod(win64Path, record);
         return new ModInstallResult(layout.Kind, destination, name, relativeToWin64, reinstalled);
+    }
+
+    internal static bool IsUe4ssPresent(string win64Path)
+        => InstallTracker.Detect(win64Path).Kind != InstallKind.None;
+
+    internal static void EnsureUe4ssPresentForModsFolder(string win64Path, ModPackageKind kind)
+    {
+        if (kind == ModPackageKind.ModsFolder && !IsUe4ssPresent(win64Path))
+            throw new InvalidOperationException(Ue4ssNotInstalledMessage);
     }
 
     internal static ModInstallPreview PreviewModInstall(string zipPath, string win64Path)
@@ -180,6 +197,7 @@ public static class ZipInstaller
         var layout = InspectModZip(archive);
         var incoming = RelativesToWin64(win64Path, layout.Kind, ListMappedFiles(archive, layout.StripPrefix));
         var name = InferModName(incoming, zipPath);
+        EnsureUe4ssPresentForModsFolder(win64Path, layout.Kind);
         return new ModInstallPreview(name, layout.Kind, FindPreviousMods(win64Path, name, incoming).Count > 0);
     }
 
@@ -525,8 +543,14 @@ public static class ZipInstaller
 
     public static void UninstallMod(string win64Path, string modId)
     {
-        var mod = ModTracker.List(win64Path).FirstOrDefault(m => m.Id == modId)
-                  ?? throw new InvalidOperationException("That mod is not in the installer list.");
+        var mod = ModTracker.List(win64Path).FirstOrDefault(m => m.Id == modId);
+        if (mod is null)
+        {
+            throw new InvalidOperationException(
+                IsUe4ssPresent(win64Path)
+                    ? "That mod is not in the installer list."
+                    : Ue4ssNotInstalledMessage);
+        }
 
         var keep = Ue4ssOwnedFiles(win64Path);
         var toRemove = mod.Files

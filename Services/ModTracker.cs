@@ -5,14 +5,51 @@ namespace UE4SSInstaller.Services;
 
 public sealed class InstalledMod
 {
+    public const int MaxDisplayLength = 50;
+
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
     public string Name { get; set; } = "";
+
+    /// <summary>Optional list name. Identity stays <see cref="Name"/>.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Label { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Note { get; set; }
 
     public ModPackageKind Kind { get; set; }
 
     /// <summary>Paths relative to <c>Binaries/Win64</c>.</summary>
     public List<string> Files { get; set; } = [];
+
+    [JsonIgnore]
+    public string DisplayName
+        => string.IsNullOrWhiteSpace(Label) ? Name : Label.Trim();
+
+    [JsonIgnore]
+    public bool HasNote => !string.IsNullOrWhiteSpace(Note);
+
+    public void ApplyDisplay(string? label, string? note)
+    {
+        var normalized = NormalizeDisplayText(label, MaxDisplayLength);
+        Label = string.Equals(normalized, Name, StringComparison.OrdinalIgnoreCase)
+            ? null
+            : normalized;
+        Note = NormalizeDisplayText(note, MaxDisplayLength);
+    }
+
+    public static string? NormalizeDisplayText(string? value, int maxLength = MaxDisplayLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var text = string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (text.Length > maxLength)
+            text = text[..maxLength].TrimEnd();
+
+        return string.IsNullOrEmpty(text) ? null : text;
+    }
 }
 
 public sealed class ModsManifest
@@ -55,6 +92,18 @@ public static class ModTracker
 
         manifest.Mods.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
         Save(win64Path, manifest);
+    }
+
+    public static bool UpdateDisplay(string win64Path, string modId, string? label, string? note)
+    {
+        var manifest = Load(win64Path);
+        var existing = manifest.Mods.Find(m => m.Id == modId);
+        if (existing is null)
+            return false;
+
+        existing.ApplyDisplay(label, note);
+        Save(win64Path, manifest);
+        return true;
     }
 
     public static InstalledMod? Remove(string win64Path, string modId)
