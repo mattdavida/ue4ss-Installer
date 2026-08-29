@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private string? _win64Path;
     private bool _busy;
     private bool _applyingSelection;
+    private bool _applyingSettings;
     private InstalledMod? _pendingModUninstall;
     private InstalledMod? _pendingEditMod;
     private string? _pendingModZip;
@@ -103,6 +104,7 @@ public partial class MainWindow : Window
             : new RowDefinitions("*,Auto,Auto,Auto,Auto,Auto,Auto");
 
         ApplyInstalledModsVisibility();
+        RefreshUe4ssOptions();
         if (showActions)
             RefreshSelectedGameTitle();
     }
@@ -399,10 +401,6 @@ public partial class MainWindow : Window
             ? null
             : GameIconLoader.FindSteamArtwork(steamPath, identity.AppId);
         var state = InstallTracker.Detect(win64Path);
-        var channelLabel = state.Kind == InstallKind.Managed
-            ? (state.Channel == Ue4ssChannel.ZDev ? "zDev" : "Release")
-            : null;
-
         _allGames.Add(new DetectedGame
         {
             Name = identity.Name,
@@ -411,7 +409,8 @@ public partial class MainWindow : Window
             ExePath = exePath,
             AppId = string.IsNullOrEmpty(identity.AppId) ? null : identity.AppId,
             Icon = GameIconLoader.Load(exePath, artwork),
-            ChannelLabel = channelLabel
+            ChannelLabel = state.GameBadge,
+            ChannelLabelTip = state.GameBadgeTip
         });
         _allGames.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
@@ -446,7 +445,7 @@ public partial class MainWindow : Window
                 TryDelete(zipPath);
             }
 
-            MarkManagedChannel(win64Path, channel);
+            ApplyInstallBadge(win64Path);
 
             if (pack is null)
             {
@@ -546,6 +545,7 @@ public partial class MainWindow : Window
             {
                 var result = await Task.Run(() => ZipInstaller.InstallMod(zipPath, win64Path));
                 RefreshInstalledMods();
+                ApplyInstallBadge(win64Path);
                 SetStatus(ZipInstaller.FormatModInstallStatus(result));
             });
             return;
@@ -558,6 +558,7 @@ public partial class MainWindow : Window
             {
                 await Task.Run(() => ZipInstaller.UninstallMod(win64Path, mod.Id));
                 RefreshInstalledMods();
+                ApplyInstallBadge(win64Path);
                 SetStatus($"Removed {name}.");
             });
             return;
@@ -566,7 +567,7 @@ public partial class MainWindow : Window
         await RunBusyAsync("Uninstalling UE4SS...", async () =>
         {
             await Task.Run(() => ZipInstaller.UninstallUe4ss(win64Path));
-            ClearManagedChannel(win64Path);
+            ApplyInstallBadge(win64Path);
             RefreshInstalledMods();
             SetStatus("UE4SS was removed from this game.");
         });
@@ -729,27 +730,115 @@ public partial class MainWindow : Window
             : "No Unreal games found in Steam. Add one manually using the button below.";
     }
 
-    private void MarkManagedChannel(string win64Path, Ue4ssChannel channel)
+    private void ApplyInstallBadge(string win64Path)
     {
-        var label = FormatChannel(channel);
+        var state = InstallTracker.Detect(win64Path);
         foreach (var game in _allGames)
         {
             if (string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase))
-                game.ChannelLabel = label;
+                game.ApplyInstallState(state);
         }
 
         ApplyGameFilter();
+        UpdateCustomUe4ssNote();
+        RefreshUe4ssOptions();
     }
 
-    private void ClearManagedChannel(string win64Path)
+    private void UpdateCustomUe4ssNote()
     {
-        foreach (var game in _allGames)
+        if (CustomUe4ssNote is null)
+            return;
+
+        if (_win64Path is null)
         {
-            if (string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase))
-                game.ChannelLabel = null;
+            CustomUe4ssNote.IsVisible = false;
+            return;
         }
 
-        ApplyGameFilter();
+        var state = InstallTracker.Detect(_win64Path);
+        if (state.Kind == InstallKind.CustomMod && !string.IsNullOrEmpty(state.GameBadgeTip))
+        {
+            CustomUe4ssNote.Text = state.GameBadgeTip;
+            CustomUe4ssNote.IsVisible = true;
+            return;
+        }
+
+        CustomUe4ssNote.IsVisible = false;
+    }
+
+    private void RefreshUe4ssOptions()
+    {
+        if (Ue4ssOptionsPanel is null)
+            return;
+
+        var showActions = _isHandheld && _handheldShowActions && _win64Path is not null;
+        if (_isHandheld && !showActions)
+        {
+            Ue4ssOptionsPanel.IsVisible = false;
+            return;
+        }
+
+        var settings = _win64Path is not null
+                       && InstallTracker.Detect(_win64Path).Kind != InstallKind.None
+            ? SettingsIniPatcher.TryReadRuntimeSettings(_win64Path)
+            : null;
+
+        Ue4ssOptionsPanel.IsVisible = settings is not null;
+        if (settings is null)
+            return;
+
+        _applyingSettings = true;
+        try
+        {
+            LoggingCheckBox.IsChecked = settings.LoggingEnabled;
+            CacheCheckBox.IsChecked = settings.UseUObjectArrayCache;
+        }
+        finally
+        {
+            _applyingSettings = false;
+        }
+
+        RefreshUe4ssOptionsEnabled();
+    }
+
+    private void RefreshUe4ssOptionsEnabled()
+    {
+        var enabled = !_busy && Ue4ssOptionsPanel is { IsVisible: true };
+        if (LoggingCheckBox is not null)
+            LoggingCheckBox.IsEnabled = enabled;
+        if (CacheCheckBox is not null)
+            CacheCheckBox.IsEnabled = enabled;
+    }
+
+    private void OnLoggingCheckedChanged(object? sender, RoutedEventArgs e)
+        => ApplyUe4ssOption(
+            () => SettingsIniPatcher.SetLoggingEnabled(_win64Path!, LoggingCheckBox.IsChecked == true),
+            LoggingCheckBox.IsChecked == true
+                ? "Enabled UE4SS logging."
+                : "Disabled UE4SS logging.");
+
+    private void OnCacheCheckedChanged(object? sender, RoutedEventArgs e)
+        => ApplyUe4ssOption(
+            () => SettingsIniPatcher.SetUObjectArrayCache(_win64Path!, CacheCheckBox.IsChecked == true),
+            CacheCheckBox.IsChecked == true
+                ? "Enabled Live View Search."
+                : "Disabled Live View Search.");
+
+    private void ApplyUe4ssOption(Action write, string status)
+    {
+        if (_applyingSettings || _busy || _win64Path is null)
+            return;
+
+        try
+        {
+            write();
+            SetStatus(status);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Failed: {ex.Message}");
+            RefreshUe4ssOptions();
+        }
     }
 
     private void SyncListSelection()
@@ -809,6 +898,7 @@ public partial class MainWindow : Window
         UninstallModButton.IsEnabled = canAct && hasSelectedMod;
         EditModButton.IsEnabled = canAct && hasSelectedMod;
         InstalledModsCombo.IsEnabled = !_busy;
+        RefreshUe4ssOptionsEnabled();
     }
 
     private void OnEditModClick(object? sender, RoutedEventArgs e)
@@ -851,6 +941,7 @@ public partial class MainWindow : Window
         }
 
         RefreshInstalledMods(id);
+        ApplyInstallBadge(_win64Path);
         var updated = ModTracker.List(_win64Path).FirstOrDefault(m => m.Id == id);
         SetStatus(updated is null
             ? "Updated the installed mod list."
@@ -904,6 +995,8 @@ public partial class MainWindow : Window
         {
             InstalledModsPanel.IsVisible = false;
             UpdateActionButtons();
+            UpdateCustomUe4ssNote();
+            RefreshUe4ssOptions();
             return;
         }
 
@@ -912,6 +1005,8 @@ public partial class MainWindow : Window
         {
             ApplyInstalledModsVisibility();
             UpdateActionButtons();
+            UpdateCustomUe4ssNote();
+            RefreshUe4ssOptions();
             return;
         }
 
@@ -919,6 +1014,8 @@ public partial class MainWindow : Window
         InstalledModsCombo.SelectedItem = state.Selected;
         ApplyInstalledModsVisibility();
         UpdateActionButtons();
+        UpdateCustomUe4ssNote();
+        RefreshUe4ssOptions();
     }
 
     private void ShowInstallStatus()

@@ -358,6 +358,103 @@ public sealed class ModInstallTests
     }
 
     [Fact]
+    public void User_mod_that_ships_shared_does_not_replace_a_ue4ss_overlay()
+    {
+        using var temp = new TempDir();
+        var win64 = PrepareWin64(temp);
+        var overlay = NamedModZip(temp, "UE4SS For Star Wars Zero Company 9 1.0 2026-08-27T16-44Z 3SLfClRiS.zip",
+            ("dwmapi.dll", "proxy"),
+            ("ue4ss/UE4SS.dll", "core"),
+            ("ue4ss/Mods/ConsoleEnablerMod/Scripts/main.lua", "console"),
+            ("ue4ss/Mods/Keybinds/Scripts/main.lua", "keys"),
+            ("ue4ss/Mods/shared/UEHelpers/UEHelpers.lua", "helpers"),
+            ("ue4ss/Mods/mods.txt", "ConsoleEnablerMod : 1"));
+        var userMod = NamedModZip(temp, "DevToolsMod.zip",
+            ("DevToolsMod/Scripts/main.lua", "devtools"),
+            ("DevToolsMod/enabled.txt", "1"),
+            ("shared/ConfigManager/ConfigManager.lua", "config"),
+            ("shared/ModMenu/ModMenu.lua", "menu"));
+
+        var overlayResult = ZipInstaller.InstallMod(overlay, win64);
+        Assert.False(overlayResult.Reinstalled);
+        Assert.Equal(ModPackageKind.GameDirectory, overlayResult.Kind);
+        Assert.Equal("UE4SS For Star Wars Zero Company", overlayResult.Name);
+        Assert.False(ZipInstaller.WouldReinstall(userMod, win64));
+
+        var preview = ZipInstaller.PreviewModInstall(userMod, win64);
+        Assert.Equal("DevToolsMod", preview.Name);
+        Assert.Equal(ModPackageKind.ModsFolder, preview.Kind);
+        Assert.False(preview.WouldReinstall);
+
+        var result = ZipInstaller.InstallMod(userMod, win64);
+        Assert.False(result.Reinstalled);
+        Assert.Equal("DevToolsMod", result.Name);
+        Assert.Equal(ModPackageKind.ModsFolder, result.Kind);
+
+        Assert.True(File.Exists(Path.Combine(win64, "dwmapi.dll")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "UE4SS.dll")));
+        Assert.Equal("helpers", File.ReadAllText(Path.Combine(win64, "ue4ss", "Mods", "shared", "UEHelpers", "UEHelpers.lua")));
+        Assert.Equal("console", File.ReadAllText(Path.Combine(win64, "ue4ss", "Mods", "ConsoleEnablerMod", "Scripts", "main.lua")));
+        Assert.Equal("devtools", File.ReadAllText(Path.Combine(win64, "ue4ss", "Mods", "DevToolsMod", "Scripts", "main.lua")));
+        Assert.Equal("config", File.ReadAllText(Path.Combine(win64, "ue4ss", "Mods", "shared", "ConfigManager", "ConfigManager.lua")));
+
+        var listed = ModTracker.List(win64).Select(mod => mod.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        Assert.Equal(["DevToolsMod", "UE4SS For Star Wars Zero Company"], listed);
+        Assert.Equal(
+            "Installed DevToolsMod into the Mods folder.",
+            ZipInstaller.FormatModInstallStatus(result));
+
+        var detected = InstallTracker.Detect(win64);
+        Assert.Equal(InstallKind.CustomMod, detected.Kind);
+        Assert.Equal("UE4SS For Star Wars Zero Company", detected.CustomModName);
+        Assert.Equal("via UE4SS For Star Wars Zero Company", detected.GameBadge);
+        Assert.Equal("Installed via mod: UE4SS For Star Wars Zero Company", detected.GameBadgeTip);
+    }
+
+    [Fact]
+    public void Two_user_mods_that_ship_shared_libraries_can_both_stay_installed()
+    {
+        using var temp = new TempDir();
+        var win64 = PrepareWin64(temp);
+        File.WriteAllText(Path.Combine(win64, "ue4ss", "UE4SS.dll"), "core");
+        var first = NamedModZip(temp, "CoolMod.zip",
+            ("CoolMod/Scripts/main.lua", "cool"),
+            ("shared/ConfigManager/ConfigManager.lua", "v1"));
+        var second = NamedModZip(temp, "OtherMod.zip",
+            ("OtherMod/Scripts/main.lua", "other"),
+            ("shared/ConfigManager/ConfigManager.lua", "v2"));
+
+        Assert.False(ZipInstaller.InstallMod(first, win64).Reinstalled);
+        Assert.False(ZipInstaller.WouldReinstall(second, win64));
+        var result = ZipInstaller.InstallMod(second, win64);
+
+        Assert.False(result.Reinstalled);
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "Mods", "CoolMod", "Scripts", "main.lua")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "Mods", "OtherMod", "Scripts", "main.lua")));
+        Assert.Equal("v2", File.ReadAllText(Path.Combine(win64, "ue4ss", "Mods", "shared", "ConfigManager", "ConfigManager.lua")));
+        Assert.Equal(2, ModTracker.List(win64).Count);
+
+        var cool = Assert.Single(ModTracker.List(win64), mod => mod.Name == "CoolMod");
+        ZipInstaller.UninstallMod(win64, cool.Id);
+        Assert.False(Directory.Exists(Path.Combine(win64, "ue4ss", "Mods", "CoolMod")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "Mods", "shared", "ConfigManager", "ConfigManager.lua")));
+        Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "Mods", "OtherMod", "Scripts", "main.lua")));
+        Assert.Equal("OtherMod", Assert.Single(ModTracker.List(win64)).Name);
+    }
+
+    [Fact]
+    public void Display_name_ignores_shared_and_uses_the_real_mod_folder()
+    {
+        using var temp = new TempDir();
+        var win64 = PrepareWin64(temp);
+        var zip = NamedModZip(temp, "MyTools.zip",
+            ("DevToolsMod/Scripts/main.lua", "devtools"),
+            ("shared/ConfigManager/ConfigManager.lua", "config"));
+
+        Assert.Equal("DevToolsMod", ZipInstaller.InstallMod(zip, win64).Name);
+    }
+
+    [Fact]
     public void Mods_folder_zip_without_ue4ss_is_rejected_and_does_not_copy_files()
     {
         using var temp = new TempDir();

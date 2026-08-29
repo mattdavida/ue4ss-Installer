@@ -30,6 +30,20 @@ public sealed class InstalledMod
     [JsonIgnore]
     public bool HasNote => !string.IsNullOrWhiteSpace(Note);
 
+    /// <summary>
+    /// A zip that ships <c>UE4SS.dll</c> is a custom UE4SS pack, not a regular lua mod.
+    /// </summary>
+    [JsonIgnore]
+    public bool ProvidesUe4ss => Files.Any(IsUe4ssDll);
+
+    public static bool IsUe4ssDll(string relative)
+    {
+        var normalized = relative.Replace('\\', '/').TrimEnd('/');
+        var slash = normalized.LastIndexOf('/');
+        var name = slash < 0 ? normalized : normalized[(slash + 1)..];
+        return name.Equals("UE4SS.dll", StringComparison.OrdinalIgnoreCase);
+    }
+
     public void ApplyDisplay(string? label, string? note)
     {
         var normalized = NormalizeDisplayText(label, MaxDisplayLength);
@@ -70,6 +84,13 @@ public static class ModTracker
 
     public static IReadOnlyList<InstalledMod> List(string win64Path)
         => Load(win64Path).Mods;
+
+    public static InstalledMod? FindUe4ssProvider(string win64Path)
+        => List(win64Path)
+            .Where(mod => mod.ProvidesUe4ss)
+            .OrderBy(mod => mod.Kind == ModPackageKind.GameDirectory ? 0 : 1)
+            .ThenBy(mod => mod.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
 
     public static InstalledMod? FindByName(string win64Path, string name)
         => Load(win64Path).Mods.FirstOrDefault(m =>

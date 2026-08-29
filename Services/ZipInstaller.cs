@@ -130,8 +130,10 @@ public static class ZipInstaller
     /// inside one wrapper folder) and <c>ue4ss/</c> overlays (signatures, extra mods) extract
     /// into Win64. Everything else extracts into the Mods folder.
     /// Identity is the inner UE4SS mod folder (not the download filename), so a Nexus zip
-    /// with a unique hash is still the same mod. A matching tracked install is removed first
-    /// (failing if the game still has those files open), then the new zip is copied.
+    /// with a unique hash is still the same mod. <c>Mods/shared</c> is a library folder, not
+    /// identity, so a user zip that ships ConfigManager does not replace a UE4SS pack overlay.
+    /// A matching tracked install is removed first (failing if the game still has those files
+    /// open), then the new zip is copied.
     /// Not recorded in the UE4SS manifest, so channel switches will not delete these files.
     /// Recorded in <c>.ue4ss-installer-mods.json</c> for per-mod uninstall.
     /// </summary>
@@ -143,7 +145,7 @@ public static class ZipInstaller
         var name = InferModName(incoming, zipPath);
         EnsureUe4ssPresentForModsFolder(win64Path, layout.Kind);
 
-        var previous = FindPreviousMods(win64Path, name, incoming);
+        var previous = FindPreviousMods(win64Path, name, incoming, layout.Kind);
         var reinstalled = previous.Count > 0;
         var previousKeep = previous.FirstOrDefault(m =>
                                string.Equals(m.Name, name, StringComparison.OrdinalIgnoreCase))
@@ -198,7 +200,10 @@ public static class ZipInstaller
         var incoming = RelativesToWin64(win64Path, layout.Kind, ListMappedFiles(archive, layout.StripPrefix));
         var name = InferModName(incoming, zipPath);
         EnsureUe4ssPresentForModsFolder(win64Path, layout.Kind);
-        return new ModInstallPreview(name, layout.Kind, FindPreviousMods(win64Path, name, incoming).Count > 0);
+        return new ModInstallPreview(
+            name,
+            layout.Kind,
+            FindPreviousMods(win64Path, name, incoming, layout.Kind).Count > 0);
     }
 
     internal static bool WouldReinstall(string zipPath, string win64Path)
@@ -271,7 +276,8 @@ public static class ZipInstaller
     internal static IReadOnlyList<InstalledMod> FindPreviousMods(
         string win64Path,
         string name,
-        IReadOnlyList<string> incomingFiles)
+        IReadOnlyList<string> incomingFiles,
+        ModPackageKind incomingKind)
     {
         var incomingSet = new HashSet<string>(
             incomingFiles.Select(NormalizeRelative),
@@ -288,6 +294,11 @@ public static class ZipInstaller
                 continue;
             }
 
+            // A Mods-folder zip is not a replacement for a UE4SS pack / overlay, even when
+            // both include Mods/shared or default UE4SS plugins.
+            if (incomingKind == ModPackageKind.ModsFolder && mod.Kind == ModPackageKind.GameDirectory)
+                continue;
+
             var modPlugins = PluginFolders(mod.Files);
             if (incomingPlugins.Count > 0 && modPlugins.Overlaps(incomingPlugins))
             {
@@ -296,7 +307,9 @@ public static class ZipInstaller
             }
 
             if (mod.Files.Select(NormalizeRelative).Any(file =>
-                    incomingSet.Contains(file) && !keep.Contains(file)))
+                    incomingSet.Contains(file)
+                    && !keep.Contains(file)
+                    && !IsSharedLibraryPath(file)))
             {
                 matches.Add(mod);
             }
@@ -311,8 +324,9 @@ public static class ZipInstaller
         foreach (var relative in win64Relatives)
         {
             var path = NormalizeRelative(relative);
-            if (TryFolderAfterPrefix(path, "ue4ss/Mods/", out var folder)
-                || TryFolderAfterPrefix(path, "Mods/", out folder))
+            if ((TryFolderAfterPrefix(path, "ue4ss/Mods/", out var folder)
+                 || TryFolderAfterPrefix(path, "Mods/", out folder))
+                && !IsSharedLibraryFolder(folder))
             {
                 folders.Add(folder);
             }
@@ -408,6 +422,17 @@ public static class ZipInstaller
            || segment.Equals("Binaries", StringComparison.OrdinalIgnoreCase)
            || segment.Equals("Content", StringComparison.OrdinalIgnoreCase)
            || segment.Equals("Config", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsSharedLibraryFolder(string segment)
+        => segment.Equals("shared", StringComparison.OrdinalIgnoreCase);
+
+    internal static bool IsSharedLibraryPath(string relative)
+    {
+        var path = NormalizeRelative(relative);
+        return (TryFolderAfterPrefix(path, "ue4ss/Mods/", out var folder)
+                || TryFolderAfterPrefix(path, "Mods/", out folder))
+               && IsSharedLibraryFolder(folder);
+    }
 
     private static bool IsDownloadNoiseName(string name)
         => !string.Equals(name, CleanDisplayName(name), StringComparison.OrdinalIgnoreCase);
@@ -553,6 +578,15 @@ public static class ZipInstaller
         }
 
         var keep = Ue4ssOwnedFiles(win64Path);
+        foreach (var other in ModTracker.List(win64Path))
+        {
+            if (other.Id == modId)
+                continue;
+
+            foreach (var file in other.Files)
+                keep.Add(NormalizeRelative(file));
+        }
+
         var toRemove = mod.Files
             .Concat(ConfigManagerSidecarFiles(win64Path, mod.Files))
             .Distinct(StringComparer.OrdinalIgnoreCase)

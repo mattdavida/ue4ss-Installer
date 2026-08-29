@@ -11,6 +11,7 @@ public sealed class DetectedGame
     public string? ExePath { get; init; }
     public Bitmap? Icon { get; init; }
     public string? ChannelLabel { get; set; }
+    public string? ChannelLabelTip { get; set; }
 
     public string Initial
     {
@@ -28,6 +29,13 @@ public sealed class DetectedGame
 
     public bool HasIcon => Icon is not null;
     public bool HasChannelLabel => !string.IsNullOrEmpty(ChannelLabel);
+    public bool HasChannelLabelTip => !string.IsNullOrEmpty(ChannelLabelTip);
     public string? SupportBadge => KnownSignatureCatalog.Find(this)?.SupportBadge;
     public bool HasSupportBadge => !string.IsNullOrEmpty(SupportBadge);
+
+    public void ApplyInstallState(InstallState state)
+    {
+        ChannelLabel = state.GameBadge;
+        ChannelLabelTip = state.GameBadgeTip;
+    }
 }
