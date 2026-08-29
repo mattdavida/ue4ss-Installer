@@ -188,6 +188,18 @@
             <Setter Property="FontSize" Value="16" />
         </Style>
 
+        <Style Selector="CheckBox">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style Selector="Window.handheld CheckBox">
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+
         <Style Selector="Window.handheld Border.GameRow">
             <Setter Property="Padding" Value="14,12" />
         </Style>

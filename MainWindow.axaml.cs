@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private string? _win64Path;
     private bool _busy;
     private bool _applyingSelection;
+    private bool _applyingSettings;
     private InstalledMod? _pendingModUninstall;
     private InstalledMod? _pendingEditMod;
     private string? _pendingModZip;
@@ -103,6 +104,7 @@ public partial class MainWindow : Window
             : new RowDefinitions("*,Auto,Auto,Auto,Auto,Auto,Auto");
 
         ApplyInstalledModsVisibility();
+        RefreshUe4ssOptions();
         if (showActions)
             RefreshSelectedGameTitle();
     }
@@ -739,6 +741,7 @@ public partial class MainWindow : Window
 
         ApplyGameFilter();
         UpdateCustomUe4ssNote();
+        RefreshUe4ssOptions();
     }
 
     private void UpdateCustomUe4ssNote()
@@ -761,6 +764,81 @@ public partial class MainWindow : Window
         }
 
         CustomUe4ssNote.IsVisible = false;
+    }
+
+    private void RefreshUe4ssOptions()
+    {
+        if (Ue4ssOptionsPanel is null)
+            return;
+
+        var showActions = _isHandheld && _handheldShowActions && _win64Path is not null;
+        if (_isHandheld && !showActions)
+        {
+            Ue4ssOptionsPanel.IsVisible = false;
+            return;
+        }
+
+        var settings = _win64Path is not null
+                       && InstallTracker.Detect(_win64Path).Kind != InstallKind.None
+            ? SettingsIniPatcher.TryReadRuntimeSettings(_win64Path)
+            : null;
+
+        Ue4ssOptionsPanel.IsVisible = settings is not null;
+        if (settings is null)
+            return;
+
+        _applyingSettings = true;
+        try
+        {
+            LoggingCheckBox.IsChecked = settings.LoggingEnabled;
+            CacheCheckBox.IsChecked = settings.UseUObjectArrayCache;
+        }
+        finally
+        {
+            _applyingSettings = false;
+        }
+
+        RefreshUe4ssOptionsEnabled();
+    }
+
+    private void RefreshUe4ssOptionsEnabled()
+    {
+        var enabled = !_busy && Ue4ssOptionsPanel is { IsVisible: true };
+        if (LoggingCheckBox is not null)
+            LoggingCheckBox.IsEnabled = enabled;
+        if (CacheCheckBox is not null)
+            CacheCheckBox.IsEnabled = enabled;
+    }
+
+    private void OnLoggingCheckedChanged(object? sender, RoutedEventArgs e)
+        => ApplyUe4ssOption(
+            () => SettingsIniPatcher.SetLoggingEnabled(_win64Path!, LoggingCheckBox.IsChecked == true),
+            LoggingCheckBox.IsChecked == true
+                ? "Enabled UE4SS logging."
+                : "Disabled UE4SS logging.");
+
+    private void OnCacheCheckedChanged(object? sender, RoutedEventArgs e)
+        => ApplyUe4ssOption(
+            () => SettingsIniPatcher.SetUObjectArrayCache(_win64Path!, CacheCheckBox.IsChecked == true),
+            CacheCheckBox.IsChecked == true
+                ? "Enabled Live View Search."
+                : "Disabled Live View Search.");
+
+    private void ApplyUe4ssOption(Action write, string status)
+    {
+        if (_applyingSettings || _busy || _win64Path is null)
+            return;
+
+        try
+        {
+            write();
+            SetStatus(status);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Failed: {ex.Message}");
+            RefreshUe4ssOptions();
+        }
     }
 
     private void SyncListSelection()
@@ -820,6 +898,7 @@ public partial class MainWindow : Window
         UninstallModButton.IsEnabled = canAct && hasSelectedMod;
         EditModButton.IsEnabled = canAct && hasSelectedMod;
         InstalledModsCombo.IsEnabled = !_busy;
+        RefreshUe4ssOptionsEnabled();
     }
 
     private void OnEditModClick(object? sender, RoutedEventArgs e)
@@ -917,6 +996,7 @@ public partial class MainWindow : Window
             InstalledModsPanel.IsVisible = false;
             UpdateActionButtons();
             UpdateCustomUe4ssNote();
+            RefreshUe4ssOptions();
             return;
         }
 
@@ -926,6 +1006,7 @@ public partial class MainWindow : Window
             ApplyInstalledModsVisibility();
             UpdateActionButtons();
             UpdateCustomUe4ssNote();
+            RefreshUe4ssOptions();
             return;
         }
 
@@ -934,6 +1015,7 @@ public partial class MainWindow : Window
         ApplyInstalledModsVisibility();
         UpdateActionButtons();
         UpdateCustomUe4ssNote();
+        RefreshUe4ssOptions();
     }
 
     private void ShowInstallStatus()
