@@ -138,4 +138,106 @@ public sealed class InstallTrackerTests
         Directory.CreateDirectory(Path.Combine(leftover, "ue4ss", "Mods"));
         Assert.Equal(InstallKind.Unmanaged, InstallTracker.Detect(leftover).Kind);
     }
+
+    [Fact]
+    public void Detects_custom_ue4ss_from_a_tracked_mod_that_ships_ue4ss_dll()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Win64");
+        Directory.CreateDirectory(Path.Combine(win64, "ue4ss"));
+        File.WriteAllText(Path.Combine(win64, "dwmapi.dll"), "proxy");
+        File.WriteAllText(Path.Combine(win64, "ue4ss", "UE4SS.dll"), "core");
+        ModTracker.SaveMod(win64, new InstalledMod
+        {
+            Name = "UE4SS For Star Wars Zero Company",
+            Kind = ModPackageKind.GameDirectory,
+            Files = ["dwmapi.dll", "ue4ss/UE4SS.dll", "ue4ss/Mods/shared/UEHelpers/UEHelpers.lua"]
+        });
+
+        var state = InstallTracker.Detect(win64);
+        Assert.Equal(InstallKind.CustomMod, state.Kind);
+        Assert.Equal("UE4SS For Star Wars Zero Company", state.CustomModName);
+        Assert.Equal("via UE4SS For Star Wars Zero Company", state.GameBadge);
+        Assert.Equal("Installed via mod: UE4SS For Star Wars Zero Company", state.GameBadgeTip);
+        Assert.Equal(
+            "Currently a custom UE4SS (installed via UE4SS For Star Wars Zero Company).",
+            state.StatusText);
+    }
+
+    [Fact]
+    public void Custom_ue4ss_badge_uses_the_mod_list_label()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Win64");
+        Directory.CreateDirectory(Path.Combine(win64, "ue4ss"));
+        ModTracker.SaveMod(win64, new InstalledMod
+        {
+            Name = "UE4SS For Star Wars Zero Company",
+            Label = "Zero Company pack",
+            Kind = ModPackageKind.GameDirectory,
+            Files = ["ue4ss/UE4SS.dll"]
+        });
+
+        var state = InstallTracker.Detect(win64);
+        Assert.Equal("via Zero Company pack", state.GameBadge);
+        Assert.Equal("Installed via mod: Zero Company pack", state.GameBadgeTip);
+    }
+
+    [Fact]
+    public void Managed_install_wins_over_a_mod_that_ships_ue4ss_dll()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Win64");
+        Directory.CreateDirectory(Path.Combine(win64, "ue4ss"));
+        File.WriteAllText(Path.Combine(win64, "dwmapi.dll"), "proxy");
+        InstallTracker.Save(win64, new InstallerManifest
+        {
+            Channel = Ue4ssChannel.Release,
+            Files = ["dwmapi.dll", "ue4ss/UE4SS.dll"]
+        });
+        ModTracker.SaveMod(win64, new InstalledMod
+        {
+            Name = "UE4SS For Star Wars Zero Company",
+            Kind = ModPackageKind.GameDirectory,
+            Files = ["dwmapi.dll", "ue4ss/UE4SS.dll"]
+        });
+
+        var state = InstallTracker.Detect(win64);
+        Assert.Equal(InstallKind.Managed, state.Kind);
+        Assert.Equal("Release", state.GameBadge);
+        Assert.Null(state.CustomModName);
+    }
+
+    [Fact]
+    public void A_lua_mod_without_ue4ss_dll_is_not_a_custom_channel()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Win64");
+        Directory.CreateDirectory(Path.Combine(win64, "ue4ss"));
+        File.WriteAllText(Path.Combine(win64, "dwmapi.dll"), "proxy");
+        ModTracker.SaveMod(win64, new InstalledMod
+        {
+            Name = "DevToolsMod",
+            Kind = ModPackageKind.ModsFolder,
+            Files = ["ue4ss/Mods/DevToolsMod/Scripts/main.lua"]
+        });
+
+        var state = InstallTracker.Detect(win64);
+        Assert.Equal(InstallKind.Unmanaged, state.Kind);
+        Assert.Null(state.GameBadge);
+        Assert.Null(ModTracker.FindUe4ssProvider(win64));
+    }
+
+    [Theory]
+    [InlineData("ue4ss/UE4SS.dll", true)]
+    [InlineData("UE4SS.dll", true)]
+    [InlineData(@"ue4ss\UE4SS.dll", true)]
+    [InlineData("ue4ss/Mods/DevToolsMod/Scripts/main.lua", false)]
+    [InlineData("dwmapi.dll", false)]
+    public void ProvidesUe4ss_is_true_only_when_the_zip_ships_ue4ss_dll(string file, bool expected)
+    {
+        var mod = new InstalledMod { Files = [file] };
+        Assert.Equal(expected, mod.ProvidesUe4ss);
+        Assert.Equal(expected, InstalledMod.IsUe4ssDll(file));
+    }
 }

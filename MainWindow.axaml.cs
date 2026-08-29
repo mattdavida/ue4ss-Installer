@@ -399,10 +399,6 @@ public partial class MainWindow : Window
             ? null
             : GameIconLoader.FindSteamArtwork(steamPath, identity.AppId);
         var state = InstallTracker.Detect(win64Path);
-        var channelLabel = state.Kind == InstallKind.Managed
-            ? (state.Channel == Ue4ssChannel.ZDev ? "zDev" : "Release")
-            : null;
-
         _allGames.Add(new DetectedGame
         {
             Name = identity.Name,
@@ -411,7 +407,8 @@ public partial class MainWindow : Window
             ExePath = exePath,
             AppId = string.IsNullOrEmpty(identity.AppId) ? null : identity.AppId,
             Icon = GameIconLoader.Load(exePath, artwork),
-            ChannelLabel = channelLabel
+            ChannelLabel = state.GameBadge,
+            ChannelLabelTip = state.GameBadgeTip
         });
         _allGames.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
 
@@ -446,7 +443,7 @@ public partial class MainWindow : Window
                 TryDelete(zipPath);
             }
 
-            MarkManagedChannel(win64Path, channel);
+            ApplyInstallBadge(win64Path);
 
             if (pack is null)
             {
@@ -546,6 +543,7 @@ public partial class MainWindow : Window
             {
                 var result = await Task.Run(() => ZipInstaller.InstallMod(zipPath, win64Path));
                 RefreshInstalledMods();
+                ApplyInstallBadge(win64Path);
                 SetStatus(ZipInstaller.FormatModInstallStatus(result));
             });
             return;
@@ -558,6 +556,7 @@ public partial class MainWindow : Window
             {
                 await Task.Run(() => ZipInstaller.UninstallMod(win64Path, mod.Id));
                 RefreshInstalledMods();
+                ApplyInstallBadge(win64Path);
                 SetStatus($"Removed {name}.");
             });
             return;
@@ -566,7 +565,7 @@ public partial class MainWindow : Window
         await RunBusyAsync("Uninstalling UE4SS...", async () =>
         {
             await Task.Run(() => ZipInstaller.UninstallUe4ss(win64Path));
-            ClearManagedChannel(win64Path);
+            ApplyInstallBadge(win64Path);
             RefreshInstalledMods();
             SetStatus("UE4SS was removed from this game.");
         });
@@ -729,27 +728,39 @@ public partial class MainWindow : Window
             : "No Unreal games found in Steam. Add one manually using the button below.";
     }
 
-    private void MarkManagedChannel(string win64Path, Ue4ssChannel channel)
+    private void ApplyInstallBadge(string win64Path)
     {
-        var label = FormatChannel(channel);
+        var state = InstallTracker.Detect(win64Path);
         foreach (var game in _allGames)
         {
             if (string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase))
-                game.ChannelLabel = label;
+                game.ApplyInstallState(state);
         }
 
         ApplyGameFilter();
+        UpdateCustomUe4ssNote();
     }
 
-    private void ClearManagedChannel(string win64Path)
+    private void UpdateCustomUe4ssNote()
     {
-        foreach (var game in _allGames)
+        if (CustomUe4ssNote is null)
+            return;
+
+        if (_win64Path is null)
         {
-            if (string.Equals(game.Win64Path, win64Path, StringComparison.OrdinalIgnoreCase))
-                game.ChannelLabel = null;
+            CustomUe4ssNote.IsVisible = false;
+            return;
         }
 
-        ApplyGameFilter();
+        var state = InstallTracker.Detect(_win64Path);
+        if (state.Kind == InstallKind.CustomMod && !string.IsNullOrEmpty(state.GameBadgeTip))
+        {
+            CustomUe4ssNote.Text = state.GameBadgeTip;
+            CustomUe4ssNote.IsVisible = true;
+            return;
+        }
+
+        CustomUe4ssNote.IsVisible = false;
     }
 
     private void SyncListSelection()
@@ -851,6 +862,7 @@ public partial class MainWindow : Window
         }
 
         RefreshInstalledMods(id);
+        ApplyInstallBadge(_win64Path);
         var updated = ModTracker.List(_win64Path).FirstOrDefault(m => m.Id == id);
         SetStatus(updated is null
             ? "Updated the installed mod list."
@@ -904,6 +916,7 @@ public partial class MainWindow : Window
         {
             InstalledModsPanel.IsVisible = false;
             UpdateActionButtons();
+            UpdateCustomUe4ssNote();
             return;
         }
 
@@ -912,6 +925,7 @@ public partial class MainWindow : Window
         {
             ApplyInstalledModsVisibility();
             UpdateActionButtons();
+            UpdateCustomUe4ssNote();
             return;
         }
 
@@ -919,6 +933,7 @@ public partial class MainWindow : Window
         InstalledModsCombo.SelectedItem = state.Selected;
         ApplyInstalledModsVisibility();
         UpdateActionButtons();
+        UpdateCustomUe4ssNote();
     }
 
     private void ShowInstallStatus()

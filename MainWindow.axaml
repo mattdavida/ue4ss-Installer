@@ -118,8 +118,11 @@
                                                            Foreground="{StaticResource AppFaint}" />
                                                 <TextBlock Text="{Binding ChannelLabel}"
                                                            IsVisible="{Binding HasChannelLabel}"
+                                                           ToolTip.Tip="{Binding ChannelLabelTip}"
                                                            FontSize="12"
-                                                           Foreground="{StaticResource AppAccent}" />
+                                                           Foreground="{StaticResource AppAccent}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           MaxWidth="160" />
                                             </StackPanel>
                                         </Grid>
                                     </Border>
@@ -226,6 +229,11 @@
                     <ComboBoxItem Content="Release" />
                     <ComboBoxItem Content="zDev" />
                 </ComboBox>
+                <TextBlock x:Name="CustomUe4ssNote"
+                           IsVisible="False"
+                           FontSize="12"
+                           Foreground="{StaticResource AppAccent}"
+                           TextWrapping="Wrap" />
             </StackPanel>
 
             <StackPanel x:Name="InstalledModsPanel"

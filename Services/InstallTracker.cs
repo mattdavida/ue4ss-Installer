@@ -7,6 +7,7 @@ public enum InstallKind
 {
     None,
     Managed,
+    CustomMod,
     Unmanaged
 }
 
@@ -14,12 +15,31 @@ public sealed class InstallState
 {
     public required InstallKind Kind { get; init; }
     public Ue4ssChannel? Channel { get; init; }
+    public string? CustomModName { get; init; }
 
     public string StatusText => Kind switch
     {
         InstallKind.Managed => $"Currently {FormatChannel(Channel)} (managed by this installer).",
+        InstallKind.CustomMod => $"Currently a custom UE4SS (installed via {CustomModName}).",
         InstallKind.Unmanaged => "UE4SS is present but was not installed by this app. Install once with the installer before switching Release/zDev, or leftovers may remain.",
         _ => "UE4SS is not installed."
+    };
+
+    /// <summary>Short game-list badge. Custom packs use <c>via {mod}</c>.</summary>
+    public string? GameBadge => Kind switch
+    {
+        InstallKind.Managed => FormatChannel(Channel),
+        InstallKind.CustomMod => string.IsNullOrWhiteSpace(CustomModName) ? "Custom" : $"via {CustomModName}",
+        _ => null
+    };
+
+    public string? GameBadgeTip => Kind switch
+    {
+        InstallKind.Managed => $"UE4SS {FormatChannel(Channel)} (managed by this installer).",
+        InstallKind.CustomMod => string.IsNullOrWhiteSpace(CustomModName)
+            ? "Installed via a custom UE4SS mod."
+            : $"Installed via mod: {CustomModName}",
+        _ => null
     };
 
     private static string FormatChannel(Ue4ssChannel? channel)
@@ -49,6 +69,16 @@ public static class InstallTracker
         var manifest = TryLoad(win64Path);
         if (manifest is not null)
             return new InstallState { Kind = InstallKind.Managed, Channel = manifest.Channel };
+
+        var custom = ModTracker.FindUe4ssProvider(win64Path);
+        if (custom is not null)
+        {
+            return new InstallState
+            {
+                Kind = InstallKind.CustomMod,
+                CustomModName = custom.DisplayName
+            };
+        }
 
         if (LooksInstalled(win64Path))
             return new InstallState { Kind = InstallKind.Unmanaged };

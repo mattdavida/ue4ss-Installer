@@ -85,10 +85,6 @@ public static class SteamScanner
                 var exePath = PathDetector.FindGameExecutable(win64);
                 var artwork = GameIconLoader.FindSteamArtwork(steamPath, appId);
                 var state = InstallTracker.Detect(win64);
-                var channelLabel = state.Kind == InstallKind.Managed
-                    ? (state.Channel == Ue4ssChannel.ZDev ? "zDev" : "Release")
-                    : null;
-
                 games.Add(new DetectedGame
                 {
                     Name = name,
@@ -97,7 +93,8 @@ public static class SteamScanner
                     ExePath = exePath,
                     AppId = appId,
                     Icon = GameIconLoader.Load(exePath, artwork),
-                    ChannelLabel = channelLabel
+                    ChannelLabel = state.GameBadge,
+                    ChannelLabelTip = state.GameBadgeTip
                 });
             }
         }
