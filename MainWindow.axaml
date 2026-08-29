@@ -43,7 +43,7 @@
         </Border>
 
         <Grid x:Name="ContentRoot"
-              RowDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto"
+              RowDefinitions="*,Auto,Auto,Auto"
               RowSpacing="10"
               Margin="20,12,20,16">
             <Grid x:Name="GamesSection"
@@ -142,36 +142,37 @@
                 </Border>
             </Grid>
 
-            <Button x:Name="AddGameManuallyButton"
-                    Grid.Row="1"
-                    Classes="ghost"
-                    Content="Add Game Manually"
-                    HorizontalAlignment="Right"
-                    Click="OnAddGameManuallyClick" />
-
-            <StackPanel x:Name="ManualAddPanel"
-                        Grid.Row="2"
-                        Spacing="8"
-                        IsVisible="False">
-                <TextBlock Text="Game folder"
-                           Foreground="{StaticResource AppMuted}"
-                           FontSize="12" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                    <TextBox x:Name="PathTextBox"
-                             Grid.Column="0"
-                             PlaceholderText="e.g. D:\SteamLibrary\steamapps\common\Asterigos"
-                             KeyDown="OnPathTextBoxKeyDown"
-                             LostFocus="OnPathTextBoxLostFocus" />
-                    <Button x:Name="BrowseButton"
-                            Grid.Column="1"
-                            Classes="ghost"
-                            Content="Browse"
-                            Click="OnBrowseClick" />
-                </Grid>
+            <StackPanel x:Name="AddGameSection"
+                        Grid.Row="1"
+                        Spacing="8">
+                <Button x:Name="AddGameManuallyButton"
+                        Classes="ghost"
+                        Content="Add Game Manually"
+                        HorizontalAlignment="Right"
+                        Click="OnAddGameManuallyClick" />
+                <StackPanel x:Name="ManualAddPanel"
+                            Spacing="8"
+                            IsVisible="False">
+                    <TextBlock Text="Game folder"
+                               Foreground="{StaticResource AppMuted}"
+                               FontSize="12" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox x:Name="PathTextBox"
+                                 Grid.Column="0"
+                                 PlaceholderText="e.g. D:\SteamLibrary\steamapps\common\Asterigos"
+                                 KeyDown="OnPathTextBoxKeyDown"
+                                 LostFocus="OnPathTextBoxLostFocus" />
+                        <Button x:Name="BrowseButton"
+                                Grid.Column="1"
+                                Classes="ghost"
+                                Content="Browse"
+                                Click="OnBrowseClick" />
+                    </Grid>
+                </StackPanel>
             </StackPanel>
 
             <StackPanel x:Name="VersionSection"
-                        Grid.Row="3"
+                        Grid.Row="2"
                         Spacing="8">
                 <StackPanel x:Name="HandheldChrome"
                             Spacing="8"
@@ -211,32 +212,125 @@
                                    VerticalAlignment="Center" />
                     </Grid>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="UE4SS version"
+                <StackPanel x:Name="ActionTabStrip"
+                            Orientation="Horizontal"
+                            Spacing="4"
+                            IsVisible="False">
+                    <Button x:Name="InstallTabButton"
+                            Classes="tab selected"
+                            Content="Install"
+                            Click="OnInstallTabClick" />
+                    <Button x:Name="DevTabButton"
+                            Classes="tab"
+                            Content="Dev"
+                            Click="OnDevTabClick" />
+                </StackPanel>
+                <Grid x:Name="ActionTabContent">
+                <StackPanel x:Name="InstallPane"
+                            Spacing="8"
+                            VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="UE4SS version"
+                                   Foreground="{StaticResource AppMuted}"
+                                   FontSize="12"
+                                   VerticalAlignment="Center" />
+                        <Border Classes="infoHint">
+                            <ToolTip.Tip>
+                                <TextBlock Text="Channel switches stay clean after one install with this app. Manual UE4SS copies can leave leftover files."
+                                           TextWrapping="Wrap"
+                                           MaxWidth="280" />
+                            </ToolTip.Tip>
+                            <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                        </Border>
+                    </StackPanel>
+                    <ComboBox x:Name="VersionComboBox" SelectedIndex="0">
+                        <ComboBoxItem Content="Release" />
+                        <ComboBoxItem Content="zDev" />
+                    </ComboBox>
+                    <TextBlock x:Name="CustomUe4ssNote"
+                               IsVisible="False"
+                               FontSize="12"
+                               Foreground="{StaticResource AppAccent}"
+                               TextWrapping="Wrap" />
+                    <StackPanel x:Name="InstalledModsPanel"
+                                Spacing="8"
+                                IsVisible="False">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="Installed mods"
+                                       Foreground="{StaticResource AppMuted}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center" />
+                            <Border Classes="infoHint">
+                                <ToolTip.Tip>
+                                    <TextBlock Text="Only zips installed with this app. Manual copies are not listed."
+                                               TextWrapping="Wrap"
+                                               MaxWidth="280" />
+                                </ToolTip.Tip>
+                                <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                            </Border>
+                        </StackPanel>
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                            <ComboBox x:Name="InstalledModsCombo"
+                                      Grid.Column="0"
+                                      PlaceholderText="No mods installed with this app"
+                                      SelectionChanged="OnInstalledModsSelectionChanged">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate x:DataType="services:InstalledMod">
+                                        <StackPanel Spacing="1">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Note}"
+                                                       IsVisible="{Binding HasNote}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource AppMuted}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <Button x:Name="EditModButton"
+                                    Grid.Column="1"
+                                    Classes="ghost"
+                                    Content="Edit"
+                                    Click="OnEditModClick"
+                                    IsEnabled="False" />
+                            <Button x:Name="UninstallModButton"
+                                    Grid.Column="2"
+                                    Classes="ghost"
+                                    Content="Uninstall Mod"
+                                    Click="OnUninstallModClick"
+                                    IsEnabled="False" />
+                        </Grid>
+                    </StackPanel>
+                    <WrapPanel x:Name="ActionButtons"
+                               ItemSpacing="8"
+                               LineSpacing="8">
+                        <Button x:Name="InstallButton"
+                                Content="Install UE4SS"
+                                Click="OnInstallClick"
+                                IsEnabled="False"
+                                Classes="accent" />
+                        <Button x:Name="InstallModButton"
+                                Content="Install Mod Zip"
+                                Click="OnInstallModClick"
+                                IsEnabled="False"
+                                Classes="ghost" />
+                        <Button x:Name="UninstallButton"
+                                Content="Uninstall UE4SS"
+                                Click="OnUninstallClick"
+                                IsEnabled="False"
+                                Classes="ghost" />
+                    </WrapPanel>
+                </StackPanel>
+                <StackPanel x:Name="Ue4ssOptionsPanel"
+                            Spacing="8"
+                            VerticalAlignment="Top"
+                            Opacity="0"
+                            IsHitTestVisible="False">
+                    <TextBlock Text="UE4SS debug options for this game."
                                Foreground="{StaticResource AppMuted}"
                                FontSize="12"
-                               VerticalAlignment="Center" />
-                    <Border Classes="infoHint">
-                        <ToolTip.Tip>
-                            <TextBlock Text="Channel switches stay clean after one install with this app. Manual UE4SS copies can leave leftover files."
-                                       TextWrapping="Wrap"
-                                       MaxWidth="280" />
-                        </ToolTip.Tip>
-                        <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                    </Border>
-                </StackPanel>
-                <ComboBox x:Name="VersionComboBox" SelectedIndex="0">
-                    <ComboBoxItem Content="Release" />
-                    <ComboBoxItem Content="zDev" />
-                </ComboBox>
-                <TextBlock x:Name="CustomUe4ssNote"
-                           IsVisible="False"
-                           FontSize="12"
-                           Foreground="{StaticResource AppAccent}"
-                           TextWrapping="Wrap" />
-                <StackPanel x:Name="Ue4ssOptionsPanel"
-                            Spacing="6"
-                            IsVisible="False">
+                               TextWrapping="Wrap" />
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <CheckBox x:Name="LoggingCheckBox"
                                   Content="Enable logging"
@@ -264,83 +358,11 @@
                         </Border>
                     </StackPanel>
                 </StackPanel>
-            </StackPanel>
-
-            <StackPanel x:Name="InstalledModsPanel"
-                        Grid.Row="4"
-                        Spacing="8"
-                        IsVisible="False">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <TextBlock Text="Installed mods"
-                               Foreground="{StaticResource AppMuted}"
-                               FontSize="12"
-                               VerticalAlignment="Center" />
-                    <Border Classes="infoHint">
-                        <ToolTip.Tip>
-                            <TextBlock Text="Only zips installed with this app. Manual copies are not listed."
-                                       TextWrapping="Wrap"
-                                       MaxWidth="280" />
-                        </ToolTip.Tip>
-                        <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
-                    </Border>
-                </StackPanel>
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                    <ComboBox x:Name="InstalledModsCombo"
-                              Grid.Column="0"
-                              PlaceholderText="No mods installed with this app"
-                              SelectionChanged="OnInstalledModsSelectionChanged">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate x:DataType="services:InstalledMod">
-                                <StackPanel Spacing="1">
-                                    <TextBlock Text="{Binding DisplayName}"
-                                               TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding Note}"
-                                               IsVisible="{Binding HasNote}"
-                                               FontSize="11"
-                                               Foreground="{StaticResource AppMuted}"
-                                               TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                    <Button x:Name="EditModButton"
-                            Grid.Column="1"
-                            Classes="ghost"
-                            Content="Edit"
-                            Click="OnEditModClick"
-                            IsEnabled="False" />
-                    <Button x:Name="UninstallModButton"
-                            Grid.Column="2"
-                            Classes="ghost"
-                            Content="Uninstall Mod"
-                            Click="OnUninstallModClick"
-                            IsEnabled="False" />
                 </Grid>
             </StackPanel>
 
-            <WrapPanel x:Name="ActionButtons"
-                       Grid.Row="5"
-                       ItemSpacing="8"
-                       LineSpacing="8">
-                <Button x:Name="InstallButton"
-                        Content="Install UE4SS"
-                        Click="OnInstallClick"
-                        IsEnabled="False"
-                        Classes="accent" />
-                <Button x:Name="InstallModButton"
-                        Content="Install Mod Zip"
-                        Click="OnInstallModClick"
-                        IsEnabled="False"
-                        Classes="ghost" />
-                <Button x:Name="UninstallButton"
-                        Content="Uninstall UE4SS"
-                        Click="OnUninstallClick"
-                        IsEnabled="False"
-                        Classes="ghost" />
-            </WrapPanel>
-
             <StackPanel x:Name="StatusSection"
-                        Grid.Row="6"
+                        Grid.Row="3"
                         Spacing="8">
                 <TextBlock x:Name="StatusText"
                            Text="Ready"

@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private bool _busy;
     private bool _applyingSelection;
     private bool _applyingSettings;
+    private bool _devTabSelected;
     private InstalledMod? _pendingModUninstall;
     private InstalledMod? _pendingEditMod;
     private string? _pendingModZip;
@@ -87,21 +88,21 @@ public partial class MainWindow : Window
         if (HandheldChrome is not null)
             HandheldChrome.IsVisible = showActions;
         GamesSection.IsVisible = showGames;
-        AddGameManuallyButton.IsVisible = showGames;
+        if (AddGameSection is not null)
+            AddGameSection.IsVisible = showGames;
         AddGameManuallyButton.HorizontalAlignment = _isHandheld
             ? Avalonia.Layout.HorizontalAlignment.Stretch
             : Avalonia.Layout.HorizontalAlignment.Right;
 
         VersionSection.IsVisible = !_isHandheld || showActions;
-        ActionButtons.IsVisible = !_isHandheld || showActions;
         StatusSection.IsVisible = !_isHandheld || showActions;
 
         if (showActions)
             ManualAddPanel.IsVisible = false;
 
         ContentRoot.RowDefinitions = showActions
-            ? new RowDefinitions("Auto,Auto,Auto,Auto,Auto,Auto,Auto")
-            : new RowDefinitions("*,Auto,Auto,Auto,Auto,Auto,Auto");
+            ? new RowDefinitions("Auto,Auto,Auto,Auto")
+            : new RowDefinitions("*,Auto,Auto,Auto");
 
         ApplyInstalledModsVisibility();
         RefreshUe4ssOptions();
@@ -766,6 +767,18 @@ public partial class MainWindow : Window
         CustomUe4ssNote.IsVisible = false;
     }
 
+    private void OnInstallTabClick(object? sender, RoutedEventArgs e)
+    {
+        _devTabSelected = false;
+        ApplyActionPanes();
+    }
+
+    private void OnDevTabClick(object? sender, RoutedEventArgs e)
+    {
+        _devTabSelected = true;
+        ApplyActionPanes();
+    }
+
     private void RefreshUe4ssOptions()
     {
         if (Ue4ssOptionsPanel is null)
@@ -774,7 +787,9 @@ public partial class MainWindow : Window
         var showActions = _isHandheld && _handheldShowActions && _win64Path is not null;
         if (_isHandheld && !showActions)
         {
-            Ue4ssOptionsPanel.IsVisible = false;
+            if (ActionTabStrip is not null)
+                ActionTabStrip.IsVisible = false;
+            ApplyActionPanes();
             return;
         }
 
@@ -783,27 +798,53 @@ public partial class MainWindow : Window
             ? SettingsIniPatcher.TryReadRuntimeSettings(_win64Path)
             : null;
 
-        Ue4ssOptionsPanel.IsVisible = settings is not null;
         if (settings is null)
+            _devTabSelected = false;
+
+        if (ActionTabStrip is not null)
+            ActionTabStrip.IsVisible = settings is not null;
+
+        if (settings is not null)
+        {
+            _applyingSettings = true;
+            try
+            {
+                LoggingCheckBox.IsChecked = settings.LoggingEnabled;
+                CacheCheckBox.IsChecked = settings.UseUObjectArrayCache;
+            }
+            finally
+            {
+                _applyingSettings = false;
+            }
+        }
+
+        ApplyActionPanes();
+    }
+
+    private void ApplyActionPanes()
+    {
+        var showDev = _devTabSelected && ActionTabStrip is { IsVisible: true };
+        SetPaneActive(InstallPane, !showDev);
+        SetPaneActive(Ue4ssOptionsPanel, showDev);
+
+        InstallTabButton?.Classes.Set("selected", !showDev);
+        DevTabButton?.Classes.Set("selected", showDev);
+        RefreshUe4ssOptionsEnabled();
+    }
+
+    private static void SetPaneActive(Control? pane, bool active)
+    {
+        if (pane is null)
             return;
 
-        _applyingSettings = true;
-        try
-        {
-            LoggingCheckBox.IsChecked = settings.LoggingEnabled;
-            CacheCheckBox.IsChecked = settings.UseUObjectArrayCache;
-        }
-        finally
-        {
-            _applyingSettings = false;
-        }
-
-        RefreshUe4ssOptionsEnabled();
+        pane.Opacity = active ? 1 : 0;
+        pane.IsHitTestVisible = active;
+        pane.IsEnabled = active;
     }
 
     private void RefreshUe4ssOptionsEnabled()
     {
-        var enabled = !_busy && Ue4ssOptionsPanel is { IsVisible: true };
+        var enabled = !_busy && _devTabSelected && ActionTabStrip is { IsVisible: true };
         if (LoggingCheckBox is not null)
             LoggingCheckBox.IsEnabled = enabled;
         if (CacheCheckBox is not null)
@@ -898,6 +939,10 @@ public partial class MainWindow : Window
         UninstallModButton.IsEnabled = canAct && hasSelectedMod;
         EditModButton.IsEnabled = canAct && hasSelectedMod;
         InstalledModsCombo.IsEnabled = !_busy;
+        if (InstallTabButton is not null)
+            InstallTabButton.IsEnabled = !_busy;
+        if (DevTabButton is not null)
+            DevTabButton.IsEnabled = !_busy;
         RefreshUe4ssOptionsEnabled();
     }
 
