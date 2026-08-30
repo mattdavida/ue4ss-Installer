@@ -90,6 +90,69 @@ public sealed class Ue4ssInstallTests
     }
 
     [Fact]
+    public void Uninstall_clears_read_only_files_inside_ue4ss()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        var zip = TestZip.Create(temp.Path,
+            ("dwmapi.dll", "proxy"),
+            ("ue4ss/UE4SS.dll", "core"),
+            ("ue4ss/locked.txt", "keep-out"));
+        ZipInstaller.InstallUe4ss(zip, win64, Ue4ssChannel.Release);
+
+        var locked = Path.Combine(win64, "ue4ss", "locked.txt");
+        File.SetAttributes(locked, File.GetAttributes(locked) | FileAttributes.ReadOnly);
+
+        ZipInstaller.UninstallUe4ss(win64);
+
+        Assert.False(Directory.Exists(Path.Combine(win64, "ue4ss")));
+        Assert.False(File.Exists(Path.Combine(win64, "dwmapi.dll")));
+        Assert.Empty(ModTracker.List(win64));
+        Assert.Equal(InstallKind.None, InstallTracker.Detect(win64).Kind);
+    }
+
+    [Fact]
+    public void ApplyInstallState_clears_a_stale_release_badge_after_uninstall()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        var zip = TestZip.Create(temp.Path,
+            ("dwmapi.dll", "proxy"),
+            ("ue4ss/UE4SS.dll", "core"));
+        ZipInstaller.InstallUe4ss(zip, win64, Ue4ssChannel.Release);
+
+        var game = new DetectedGame
+        {
+            Name = "Mortal Shell II",
+            InstallPath = temp.Path,
+            Win64Path = win64
+        };
+        game.ApplyInstallState(InstallTracker.Detect(win64));
+        Assert.Equal("Release", game.ChannelLabel);
+        Assert.True(game.HasChannelLabel);
+
+        var notified = new List<string>();
+        game.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName is not null)
+                notified.Add(args.PropertyName);
+        };
+
+        ZipInstaller.UninstallUe4ss(win64);
+        game.ApplyInstallState(InstallTracker.Detect(win64));
+
+        Assert.Equal(InstallKind.None, InstallTracker.Detect(win64).Kind);
+        Assert.Null(game.ChannelLabel);
+        Assert.False(game.HasChannelLabel);
+        Assert.Contains(nameof(DetectedGame.ChannelLabel), notified);
+        Assert.Contains(nameof(DetectedGame.HasChannelLabel), notified);
+    }
+
+    [Fact]
     public void Uninstall_ue4ss_clears_installed_mods_state_so_the_combo_has_no_selection()
     {
         using var temp = new TempDir();

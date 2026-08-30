@@ -654,6 +654,11 @@ public partial class MainWindow : Window
         return $"This installs {name} into {target}. You can uninstall it later from Installed mods.";
     }
 
+    internal static string DescribeUninstallMod(InstalledMod mod)
+        => mod.ProvidesUe4ss
+            ? "This deletes the custom UE4SS install and every mod this app installed, including the ue4ss folder and Win64 proxy DLLs such as dwmapi.dll."
+            : "This deletes the files this app installed for that mod. UE4SS itself is left alone.";
+
     private void OnUninstallModClick(object? sender, RoutedEventArgs e)
     {
         if (_win64Path is null || _busy)
@@ -665,9 +670,8 @@ public partial class MainWindow : Window
         _pendingModZip = null;
         _pendingModUninstall = mod;
         HideEditModOverlay();
-        ConfirmTitle.Text = $"Remove {mod.DisplayName}?";
-        ConfirmBody.Text =
-            "This deletes the files this app installed for that mod. UE4SS itself is left alone.";
+        ConfirmTitle.Text = mod.ProvidesUe4ss ? "Uninstall UE4SS?" : $"Remove {mod.DisplayName}?";
+        ConfirmBody.Text = DescribeUninstallMod(mod);
         ConfirmActionButton.Content = "Uninstall";
         UninstallConfirmOverlay.IsVisible = true;
     }
@@ -714,6 +718,9 @@ public partial class MainWindow : Window
         _applyingSelection = true;
         try
         {
+            // Same objects stay in the list after uninstall; drop ItemsSource so
+            // Avalonia cannot keep a stale Release/via-pack chip on recycled rows.
+            GamesListBox.ItemsSource = null;
             GamesListBox.ItemsSource = list;
             GamesListBox.SelectedItem = selected;
         }
@@ -1032,9 +1039,9 @@ public partial class MainWindow : Window
         if (selectId is null)
             HideEditModOverlay();
 
-        InstalledModsCombo.SelectedItem = null;
-        InstalledModsCombo.SelectedIndex = -1;
-        InstalledModsCombo.ItemsSource = null;
+        var state = GetInstalledModsState(_win64Path, selectId);
+        InstalledModsCombo.ItemsSource = state.Mods;
+        InstalledModsCombo.SelectedItem = state.Selected;
 
         if (_win64Path is null)
         {
@@ -1045,18 +1052,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        var state = GetInstalledModsState(_win64Path, selectId);
-        if (state.Mods.Count == 0)
-        {
-            ApplyInstalledModsVisibility();
-            UpdateActionButtons();
-            UpdateCustomUe4ssNote();
-            RefreshUe4ssOptions();
-            return;
-        }
-
-        InstalledModsCombo.ItemsSource = state.Mods;
-        InstalledModsCombo.SelectedItem = state.Selected;
         ApplyInstalledModsVisibility();
         UpdateActionButtons();
         UpdateCustomUe4ssNote();

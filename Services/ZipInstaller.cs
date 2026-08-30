@@ -64,35 +64,44 @@ public static class ZipInstaller
 
     /// <summary>
     /// Removes UE4SS: deletes <c>ue4ss/</c> (mods and signatures included) and Win64-root
-    /// proxy DLLs such as <c>dwmapi.dll</c>. Extra root files from a managed manifest are
-    /// deleted too.
+    /// proxy DLLs such as <c>dwmapi.dll</c>. Extra root files from a managed manifest or a
+    /// tracked custom pack are deleted too.
     /// </summary>
     public static void UninstallUe4ss(string win64Path)
     {
-        var manifest = InstallTracker.TryLoad(win64Path);
         var parents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var win64Full = Path.GetFullPath(win64Path);
+        var extras = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        var manifest = InstallTracker.TryLoad(win64Path);
         if (manifest is not null)
         {
             foreach (var relative in manifest.Files)
+                extras.Add(NormalizeRelative(relative));
+        }
+
+        foreach (var tracked in ModTracker.List(win64Path))
+        {
+            foreach (var relative in tracked.Files)
+                extras.Add(NormalizeRelative(relative));
+        }
+
+        foreach (var relative in extras)
+        {
+            if (relative.StartsWith("ue4ss/", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(relative, "ue4ss", StringComparison.OrdinalIgnoreCase))
             {
-                var norm = NormalizeRelative(relative);
-                if (norm.StartsWith("ue4ss/", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(norm, "ue4ss", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var dest = SafeCombine(win64Path, norm);
-                if (dest is null)
-                    continue;
-
-                TryDeleteFile(dest);
-                var parent = Path.GetDirectoryName(dest);
-                if (!string.IsNullOrEmpty(parent))
-                    parents.Add(parent);
+                continue;
             }
+
+            var dest = SafeCombine(win64Path, relative);
+            if (dest is null)
+                continue;
+
+            TryDeleteFile(dest);
+            var parent = Path.GetDirectoryName(dest);
+            if (!string.IsNullOrEmpty(parent))
+                parents.Add(parent);
         }
 
         foreach (var name in new[] { "dwmapi.dll", "UE4SS.dll" })
@@ -103,7 +112,10 @@ public static class ZipInstaller
 
         var ue4ssDir = Path.Combine(win64Path, "ue4ss");
         if (Directory.Exists(ue4ssDir))
-            Directory.Delete(ue4ssDir, recursive: true);
+            TryDeleteDirectory(ue4ssDir);
+
+        TryDeleteFile(Path.Combine(win64Path, InstallerManifest.FileName));
+        TryDeleteFile(Path.Combine(win64Path, ModsManifest.FileName));
 
         foreach (var dir in parents.OrderByDescending(p => p.Length))
             TryDeleteEmptyAncestors(dir, win64Full);
@@ -122,6 +134,44 @@ public static class ZipInstaller
         catch (Exception ex)
         {
             throw new IOException($"Could not delete {path}: {ex.Message}", ex);
+        }
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (!Directory.Exists(path))
+                return;
+
+            ClearReadOnlyTree(path);
+            Directory.Delete(path, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            throw new IOException($"Could not delete {path}: {ex.Message}", ex);
+        }
+    }
+
+    private static void ClearReadOnlyTree(string directory)
+    {
+        foreach (var file in Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories))
+            ClearReadOnly(file);
+
+        foreach (var dir in Directory.EnumerateDirectories(directory, "*", SearchOption.AllDirectories)
+                     .OrderByDescending(path => path.Length)
+                     .Append(directory))
+        {
+            try
+            {
+                var attrs = File.GetAttributes(dir);
+                if ((attrs & FileAttributes.ReadOnly) != 0)
+                    File.SetAttributes(dir, attrs & ~FileAttributes.ReadOnly);
+            }
+            catch
+            {
+                // Delete will surface the real error.
+            }
         }
     }
 
@@ -220,7 +270,11 @@ public static class ZipInstaller
 
     internal static string InferModName(IEnumerable<string> win64Relatives, string zipPath)
     {
-        var plugins = PluginFolders(win64Relatives);
+        var files = win64Relatives.Select(NormalizeRelative).ToList();
+        if (files.Any(InstalledMod.IsUe4ssDll))
+            return CleanZipStem(zipPath);
+
+        var plugins = PluginFolders(files);
         if (plugins.Count == 1)
         {
             var folder = plugins.First();
@@ -283,11 +337,21 @@ public static class ZipInstaller
             incomingFiles.Select(NormalizeRelative),
             StringComparer.OrdinalIgnoreCase);
         var incomingPlugins = PluginFolders(incomingSet);
+        var incomingProvidesUe4ss = incomingSet.Any(InstalledMod.IsUe4ssDll);
         var keep = Ue4ssOwnedFiles(win64Path);
         var matches = new List<InstalledMod>();
 
         foreach (var mod in ModTracker.List(win64Path))
         {
+            if (mod.ProvidesUe4ss && !incomingProvidesUe4ss)
+                continue;
+
+            if (incomingProvidesUe4ss && mod.ProvidesUe4ss)
+            {
+                matches.Add(mod);
+                continue;
+            }
+
             if (string.Equals(mod.Name, name, StringComparison.OrdinalIgnoreCase))
             {
                 matches.Add(mod);
@@ -575,6 +639,12 @@ public static class ZipInstaller
                 IsUe4ssPresent(win64Path)
                     ? "That mod is not in the installer list."
                     : Ue4ssNotInstalledMessage);
+        }
+
+        if (mod.ProvidesUe4ss)
+        {
+            UninstallUe4ss(win64Path);
+            return;
         }
 
         var keep = Ue4ssOwnedFiles(win64Path);

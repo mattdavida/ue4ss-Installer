@@ -499,7 +499,7 @@ public sealed class ModInstallTests
         Assert.True(File.Exists(Path.Combine(win64, "dwmapi.dll")));
         Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "UE4SS.dll")));
         Assert.True(File.Exists(Path.Combine(win64, "ue4ss", "Mods", "Included", "Scripts", "main.lua")));
-        Assert.Equal("Included", Assert.Single(ModTracker.List(win64)).Name);
+        Assert.Equal("UE4SS-pack", Assert.Single(ModTracker.List(win64)).Name);
     }
 
     [Fact]
