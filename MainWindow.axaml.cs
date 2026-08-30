@@ -718,6 +718,9 @@ public partial class MainWindow : Window
         _applyingSelection = true;
         try
         {
+            // Same objects stay in the list after uninstall; drop ItemsSource so
+            // Avalonia cannot keep a stale Release/via-pack chip on recycled rows.
+            GamesListBox.ItemsSource = null;
             GamesListBox.ItemsSource = list;
             GamesListBox.SelectedItem = selected;
         }
