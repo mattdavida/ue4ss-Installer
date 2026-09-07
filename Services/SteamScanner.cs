@@ -9,6 +9,7 @@ namespace UE4SSInstaller.Services;
 /// Steam libraries are discovered the same way as MelonLoader.Installer: registry / well-known
 /// paths, then <c>libraryfolders.vdf</c> and <c>appmanifest_*.acf</c>. Unity-specific validation
 /// is not used; <see cref="PathDetector.FindWin64Directory"/> is the only game filter.
+/// That search is visit-capped so large non-Unreal installs do not stall the scan.
 /// </summary>
 public static class SteamScanner
 {

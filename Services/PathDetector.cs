@@ -15,8 +15,20 @@ public static class PathDetector
         "Saved",
         "DerivedDataCache",
         "Movies",
+        "Plugins",
+        "_CommonRedist",
+        "EasyAntiCheat",
+        "Redistributables",
+        "__Installer",
         ".git"
     };
+
+    /// <summary>
+    /// Stop walking a Steam install after this many folders. Unreal games ship as
+    /// <c>GameName/Binaries/Win64</c> a couple of levels down; 30 is already past a
+    /// realistic tree. RE Engine / CAPCOM installs used to freeze the scan.
+    /// </summary>
+    internal const int MaxDirectoriesToVisit = 30;
 
     /// <summary>
     /// Returns the absolute path to <c>Binaries/Win64</c>, or <see langword="null"/> if none is found.
@@ -32,8 +44,9 @@ public static class PathDetector
             return startDir;
 
         // Steam's game root is usually a wrapper exe + GameName/Binaries/Win64 a few levels down.
-        // Bounded + skip Content/Engine so we don't walk the entire Unreal asset tree.
-        return FindWin64Under(startDir, maxDepth: 8);
+        // Probe Binaries/Win64 at each folder, prefer Unreal-shaped children, and cap visits
+        // so a huge non-Unreal install cannot stall the Steam scan.
+        return FindWin64Under(startDir, maxDepth: 8, MaxDirectoriesToVisit);
     }
 
     /// <summary>
@@ -105,34 +118,43 @@ public static class PathDetector
         return null;
     }
 
-    private static string? FindWin64Under(string directory, int maxDepth)
+    private static string? FindWin64Under(string directory, int maxDepth, int visitLimit)
     {
         var pending = new Queue<(string Path, int Depth)>();
         pending.Enqueue((directory, 0));
+        var visited = 0;
 
         while (pending.Count > 0)
         {
             var (current, depth) = pending.Dequeue();
+            if (++visited > visitLimit)
+                return null;
+
             if (IsTargetWin64(current))
                 return current;
+
+            var probed = TryBinariesWin64(current);
+            if (probed is not null)
+                return probed;
 
             if (depth >= maxDepth)
                 continue;
 
-            IEnumerable<string> children;
+            List<string> children;
             try
             {
-                children = Directory.EnumerateDirectories(current);
+                children = Directory.EnumerateDirectories(current)
+                    .Where(child => !SkipDirectoryNames.Contains(Path.GetFileName(child)))
+                    .ToList();
             }
             catch (Exception)
             {
                 continue;
             }
 
-            foreach (var child in children)
+            foreach (var child in children.OrderByDescending(LooksLikeUnrealProjectRoot))
             {
-                var name = Path.GetFileName(child);
-                if (SkipDirectoryNames.Contains(name))
+                if (Path.GetFileName(child).Equals("Binaries", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 pending.Enqueue((child, depth + 1));
@@ -140,6 +162,34 @@ public static class PathDetector
         }
 
         return null;
+    }
+
+    private static string? TryBinariesWin64(string directory)
+    {
+        try
+        {
+            var candidate = Path.Combine(directory, "Binaries", "Win64");
+            return Directory.Exists(candidate) && IsTargetWin64(candidate) ? candidate : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static bool LooksLikeUnrealProjectRoot(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(Path.Combine(directory, "Binaries")))
+                return true;
+
+            return Directory.EnumerateFiles(directory, "*.uproject").Any();
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static bool IsTargetWin64(string directory)

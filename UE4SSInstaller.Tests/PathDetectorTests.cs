@@ -51,6 +51,30 @@ public sealed class PathDetectorTests
     }
 
     [Fact]
+    public void Finds_a_game_Win64_without_walking_a_huge_sibling_tree()
+    {
+        using var temp = new TempDir();
+        var win64 = temp.Combine("MyGame", "Binaries", "Win64");
+        Directory.CreateDirectory(win64);
+
+        for (var i = 0; i < PathDetector.MaxDirectoriesToVisit + 50; i++)
+            Directory.CreateDirectory(temp.Combine("aaaJunk", $"chunk_{i:D4}", "nested"));
+
+        var found = PathDetector.FindWin64Directory(temp.Path);
+        Assert.Equal(Path.GetFullPath(win64), found);
+    }
+
+    [Fact]
+    public void Gives_up_on_a_huge_non_unreal_tree_instead_of_walking_everything()
+    {
+        using var temp = new TempDir();
+        for (var i = 0; i < PathDetector.MaxDirectoriesToVisit + 50; i++)
+            Directory.CreateDirectory(temp.Combine("REEngineJunk", $"chunk_{i:D4}", "nested"));
+
+        Assert.Null(PathDetector.FindWin64Directory(temp.Path));
+    }
+
+    [Fact]
     public void Rejects_Engine_Win64_when_that_folder_is_picked()
     {
         using var temp = new TempDir();
